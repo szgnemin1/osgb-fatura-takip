@@ -53,7 +53,7 @@ const Sidebar = () => {
       </nav>
 
       <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
-        v1.3.2 • OSGB Fatura Takip
+        v1.4.0 • OSGB Fatura Takip
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 {
   "name": "osgb-fatura-takip",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "private": true,
   "homepage": "./",
   "main": "public/electron.js",

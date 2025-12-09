@@ -1,3 +1,4 @@
+
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 
@@ -5,8 +6,9 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
     height: 850,
-    minWidth: 1024,
-    minHeight: 768,
+    minWidth: 400, // Kısıtlama düşürüldü
+    minHeight: 300, // Kısıtlama düşürüldü
+    resizable: true, // Yeniden boyutlandırma aktif
     title: "OSGB Fatura Takip",
     icon: path.join(__dirname, 'favicon.ico'),
     webPreferences: {

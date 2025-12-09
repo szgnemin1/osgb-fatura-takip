@@ -15,6 +15,7 @@ const FirmDetails = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentDescription, setPaymentDescription] = useState('');
 
   // Debt Modal State
   const [isDebtModalOpen, setIsDebtModalOpen] = useState(false);
@@ -59,7 +60,7 @@ const FirmDetails = () => {
       firmId: selectedFirmId,
       date: paymentDate, // Seçilen tarih
       type: TransactionType.PAYMENT,
-      description: 'Tahsilat',
+      description: paymentDescription || 'Tahsilat',
       debt: 0,
       credit: Number(paymentAmount),
       month: selectedDateObj.getMonth() + 1,
@@ -69,6 +70,7 @@ const FirmDetails = () => {
 
     setIsPaymentModalOpen(false);
     setPaymentAmount('');
+    setPaymentDescription('');
     setPaymentDate(new Date().toISOString().split('T')[0]);
   };
 
@@ -383,6 +385,16 @@ const FirmDetails = () => {
                     className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
                     />
                 </div>
+                 <div>
+                    <label className="block text-sm text-slate-400 mb-1">Açıklama (Opsiyonel)</label>
+                    <input 
+                    type="text"
+                    value={paymentDescription}
+                    onChange={e => setPaymentDescription(e.target.value)}
+                    placeholder="Örn: Nakit, Havale, EFT..."
+                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500"
+                    />
+                </div>
               </div>
               <div className="flex justify-end gap-3">
                 <button 
@@ -513,7 +525,6 @@ const FirmDetails = () => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

@@ -36,6 +36,7 @@ export interface GlobalSettings {
   vatRateExpert: number;
   vatRateDoctor: number;
   vatRateHealth: number;
+  bankInfo: string; // Banka ve IBAN Bilgisi Metni
 }
 
 export enum TransactionType {

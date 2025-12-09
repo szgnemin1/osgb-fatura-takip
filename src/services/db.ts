@@ -1,4 +1,3 @@
-
 import { Firm, Transaction, TransactionType, PreparationItem, InvoiceType, GlobalSettings, PricingModel, LogEntry, PricingTier } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -29,7 +28,6 @@ if (isElectron) {
     path = (window as any).require('path');
     
     // Windows: %APPDATA%/OSGB Fatura Takip/database.json
-    // Fix: process type casting to avoid "Property 'platform' does not exist on type 'Process'"
     const appData = process.env.APPDATA || ((process as any).platform === 'darwin' ? process.env.HOME + '/Library/Preferences' : process.env.HOME + "/.local/share");
     const dir = path.join(appData, 'OSGB Fatura Takip');
     
@@ -139,13 +137,14 @@ export const db = {
       vatRateExpert: 20,
       vatRateDoctor: 10,
       vatRateHealth: 10,
-      reportEmail: ''
+      reportEmail: '',
+      bankInfo: 'Yeni Banka Hesap Bilgilerimiz; CANKAYA ORTAK SAĞLIK GÜV.BİR.SAN.TİC.LTD.ŞTİ. TR12 0015 7000 0000 0157 3026 68'
     });
   },
 
   saveGlobalSettings: (settings: GlobalSettings) => {
     setStorage(STORAGE_KEYS.GLOBAL_SETTINGS, settings);
-    db.addLog('Ayarlar Güncellendi', 'Global hakediş oranları değiştirildi.');
+    db.addLog('Ayarlar Güncellendi', 'Global parametreler değiştirildi.');
   },
 
   // Firms
@@ -256,7 +255,7 @@ export const db = {
       globalSettings: getStorage(STORAGE_KEYS.GLOBAL_SETTINGS, {}),
       logs: getStorage(STORAGE_KEYS.LOGS, []),
       backupDate: new Date().toISOString(),
-      version: '1.3.2'
+      version: '1.4.0'
     };
   },
 
@@ -277,7 +276,7 @@ export const db = {
   },
 
   bulkImportFirms: (workbook: any) => {
-    // Toplu import mantığı (Önceki kodların aynısı)
+    // Toplu import mantığı
     const currentFirms = getStorage<Firm[]>(STORAGE_KEYS.FIRMS, []);
     const currentTrans = getStorage<Transaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
     
@@ -341,19 +340,23 @@ export const db = {
       newFirmsCount++;
 
       const openingBalance = Number(row['Başlangıç Borcu']) || 0;
-      if (openingBalance > 0) {
+      
+      // NEGATİF BAKİYE KONTROLÜ (Alacak ise Tahsilat, Borç ise Fatura)
+      if (openingBalance !== 0) {
+        const isDebt = openingBalance > 0;
+        
         currentTrans.push({
           id: generateId(),
           firmId: newId,
           date: new Date().toISOString(),
-          type: TransactionType.INVOICE,
+          type: isDebt ? TransactionType.INVOICE : TransactionType.PAYMENT,
           description: 'Açılış Devir Bakiyesi',
-          debt: openingBalance,
-          credit: 0,
+          debt: isDebt ? openingBalance : 0,
+          credit: isDebt ? 0 : Math.abs(openingBalance),
           month: new Date().getMonth() + 1,
           year: new Date().getFullYear(),
           status: 'APPROVED',
-          invoiceType: newFirm.defaultInvoiceType
+          invoiceType: isDebt ? newFirm.defaultInvoiceType : undefined
         });
         newTransCount++;
       }

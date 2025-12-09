@@ -6,6 +6,19 @@ Bu proje hem **Web Uygulaması** hem de **Windows Masaüstü Uygulaması (.exe)*
 
 ![OSGB Dashboard Önizleme](https://via.placeholder.com/1200x600?text=OSGB+Fatura+Takip+Dashboard)
 
+### 🔔 v1.4.0 Güncelleme Notları (YENİ)
+Bu sürümle birlikte sistem profesyonel masaüstü standartlarına yükseltilmiştir:
+
+1.  **Masaüstü Veritabanı Motoru (EXE):** Uygulama artık verileri tarayıcı önbelleğine hapsetmiyor. Windows'un `AppData` klasöründe fiziksel bir dosyaya (`database.json`) anlık kayıt yapıyor. Verileriniz artık çok daha güvende.
+2.  **Gelişmiş Excel Entegrasyonu:** 
+    *   **Çok Sayfalı Yapı:** Firmalar ve Kademeli Fiyatlar tek seferde yüklenebiliyor.
+    *   **Akıllı Hesaplama:** "KDV Hariç" girilen fiyatlar otomatik hesaplanıyor. Eksi (-) bakiye girildiğinde sistem bunu otomatik "Alacak/Tahsilat" olarak işliyor.
+3.  **Dinamik KDV Yönetimi:** Sabit oranlar kalktı. Uzman, Doktor ve Sağlık hizmetleri için KDV oranlarını artık **Ayarlar** menüsünden dilediğiniz gibi değiştirebilirsiniz.
+4.  **Akıllı Kopyalama Sistemi:** Fatura kopyalama butonu artık firmanın **Eski Borcu + Yeni Fatura** tutarını toplayarak toplam bakiyeyi ve IBAN bilgisini tek metin halinde kopyalıyor.
+5.  **Esnek Arayüz:** Masaüstü penceresi artık serbestçe boyutlandırılabilir.
+
+---
+
 ## 🚀 Özellikler
 
 ### 1. 💼 Gelişmiş Firma Yönetimi
@@ -32,7 +45,7 @@ Bu proje hem **Web Uygulaması** hem de **Windows Masaüstü Uygulaması (.exe)*
 *   Tüm verileri Excel ve PDF formatında dışa aktarma.
 
 ### 5. ☁️ Hibrit Veri Yönetimi
-*   **Yerel Çalışma:** Veriler varsayılan olarak tarayıcıda/cihazda saklanır (LocalStorage).
+*   **Yerel Çalışma:** Veriler varsayılan olarak cihazda saklanır.
 *   **Bulut Senkronizasyon:** Google Firebase Realtime Database ile verileri ofis ve ev arasında taşıma imkanı (Ücretsiz).
 *   **Tam Yedekleme:** Veritabanını `.json` olarak indirip geri yükleme özelliği.
 

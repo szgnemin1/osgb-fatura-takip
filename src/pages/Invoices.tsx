@@ -68,6 +68,7 @@ const Invoices = () => {
   const [pendingInvoices, setPendingInvoices] = useState<InvoiceWithDetails[]>([]);
   const [approvedInvoices, setApprovedInvoices] = useState<InvoiceWithDetails[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [globalSettings, setGlobalSettings] = useState(db.getGlobalSettings());
   
   // FİLTRE STATE
   const [filterType, setFilterType] = useState<'ALL' | InvoiceType>('ALL');
@@ -102,6 +103,8 @@ const Invoices = () => {
         .filter(t => t.status === 'APPROVED')
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     );
+    
+    setGlobalSettings(db.getGlobalSettings());
   };
 
   useEffect(() => {
@@ -136,7 +139,10 @@ const Invoices = () => {
   const copyToClipboard = (text: string) => {
     if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
-      // Sessiz kopya
+      // Sessiz başarılı
+    }).catch(err => {
+      console.error('Kopyalama hatası:', err);
+      alert('Kopyalama başarısız oldu. Lütfen manuel seçip kopyalayın.');
     });
   };
 
@@ -146,26 +152,38 @@ const Invoices = () => {
   };
 
   const handleSmartTextCopy = (inv: Transaction) => {
-    const textAmount = numberToTurkishText(inv.debt);
-    const allTrans = db.getTransactions();
-    const firmTrans = allTrans.filter(t => t.firmId === inv.firmId && (t.status === 'APPROVED' || !t.status));
-    
-    const totalDebited = firmTrans.reduce((sum, t) => sum + t.debt, 0);
-    const totalPaid = firmTrans.reduce((sum, t) => sum + t.credit, 0);
-    const priorBalance = totalDebited - totalPaid;
+    try {
+        const textAmount = numberToTurkishText(inv.debt);
+        
+        // Firmanın geçmiş bakiyesini hesapla
+        const allTrans = db.getTransactions();
+        const firmTrans = allTrans.filter(t => t.firmId === inv.firmId && (t.status === 'APPROVED' || !t.status));
+        
+        const totalDebited = firmTrans.reduce((sum, t) => sum + t.debt, 0);
+        const totalPaid = firmTrans.reduce((sum, t) => sum + t.credit, 0);
+        const priorBalance = totalDebited - totalPaid;
 
-    let finalStr = textAmount;
+        let finalStr = textAmount;
 
-    if (priorBalance > 0.1) {
-        const totalDebt = priorBalance + inv.debt;
-        const dateStr = new Date().toLocaleDateString('tr-TR');
-        const formattedTotal = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalDebt);
+        // MANTIK: Geçmiş borcu VARSA (>0), toplama bakiyeyi ekle. YOKSA (<=0), sadece tutarı kopyala.
+        if (priorBalance > 0.1) {
+            const totalDebt = priorBalance + inv.debt;
+            const dateStr = new Date().toLocaleDateString('tr-TR');
+            const formattedTotal = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalDebt);
+            
+            // Ayarlardan gelen dinamik banka bilgisi
+            const bankText = globalSettings.bankInfo || 'Banka bilgisi ayarlanmadı.';
 
-        finalStr += ` "${dateStr} Tarihi itibariyle Borç Bakiyesi: ${formattedTotal}'dir. Yeni Banka Hesap Bilgilerimiz; CANKAYA ORTAK SAĞLIK GÜV.BİR.SAN.TİC.LTD.ŞTİ. TR12 0015 7000 0000 0157 3026 68`;
+            finalStr += ` "${dateStr} Tarihi itibariyle Borç Bakiyesi: ${formattedTotal}'dir. ${bankText}`;
+        }
+
+        navigator.clipboard.writeText(finalStr).then(() => {
+            alert("Metin panoya kopyalandı!");
+        });
+    } catch (e) {
+        console.error(e);
+        alert("Metin oluşturulurken hata oluştu.");
     }
-
-    copyToClipboard(finalStr);
-    alert("Metin kopyalandı!");
   };
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
@@ -173,9 +191,9 @@ const Invoices = () => {
 
   const handleExportExcel = () => {
     const dataToExport = [...filteredPending, ...(showHistory ? filteredApproved : [])].map(inv => {
-        const netExpert = (inv.calculatedDetails?.expertShare || 0) / 1.2;
-        const netDoctor = (inv.calculatedDetails?.doctorShare || 0) / 1.1;
-        const netHealth = (inv.calculatedDetails?.extraItemAmount || 0) / 1.1;
+        const netExpert = (inv.calculatedDetails?.expertShare || 0) / (1 + globalSettings.vatRateExpert / 100);
+        const netDoctor = (inv.calculatedDetails?.doctorShare || 0) / (1 + globalSettings.vatRateDoctor / 100);
+        const netHealth = (inv.calculatedDetails?.extraItemAmount || 0) / (1 + globalSettings.vatRateHealth / 100);
         
         return {
             'Firma Adı': inv.firmName,
@@ -194,9 +212,9 @@ const Invoices = () => {
 
   const handleExportPDF = () => {
     const dataToExport = [...filteredPending, ...(showHistory ? filteredApproved : [])].map(inv => {
-        const netExpert = (inv.calculatedDetails?.expertShare || 0) / 1.2;
-        const netDoctor = (inv.calculatedDetails?.doctorShare || 0) / 1.1;
-        const netHealth = (inv.calculatedDetails?.extraItemAmount || 0) / 1.1;
+        const netExpert = (inv.calculatedDetails?.expertShare || 0) / (1 + globalSettings.vatRateExpert / 100);
+        const netDoctor = (inv.calculatedDetails?.doctorShare || 0) / (1 + globalSettings.vatRateDoctor / 100);
+        const netHealth = (inv.calculatedDetails?.extraItemAmount || 0) / (1 + globalSettings.vatRateHealth / 100);
         return [
             inv.firmName,
             formatCurrency(netExpert),
@@ -311,9 +329,9 @@ const Invoices = () => {
             </thead>
             <tbody className="divide-y divide-slate-700">
               {filteredPending.map(inv => {
-                const netExpert = (inv.calculatedDetails?.expertShare || 0) / 1.2;
-                const netDoctor = (inv.calculatedDetails?.doctorShare || 0) / 1.1;
-                const netHealth = (inv.calculatedDetails?.extraItemAmount || 0) / 1.1;
+                const netExpert = (inv.calculatedDetails?.expertShare || 0) / (1 + globalSettings.vatRateExpert / 100);
+                const netDoctor = (inv.calculatedDetails?.doctorShare || 0) / (1 + globalSettings.vatRateDoctor / 100);
+                const netHealth = (inv.calculatedDetails?.extraItemAmount || 0) / (1 + globalSettings.vatRateHealth / 100);
 
                 return (
                 <tr key={inv.id} className="hover:bg-slate-700/50 transition-colors">

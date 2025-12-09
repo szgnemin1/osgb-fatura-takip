@@ -3,7 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { exporter } from '../services/exporter';
 import { cloudService } from '../services/cloud';
-import { Save, Upload, Download, Database, AlertTriangle, FileSpreadsheet, Cloud, Percent } from 'lucide-react';
+import { Save, Upload, Download, Database, AlertTriangle, FileSpreadsheet, Cloud, Percent, Landmark } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { GlobalSettings } from '../types';
 
@@ -20,7 +20,8 @@ const Settings = () => {
       vatRateExpert: 20,
       vatRateDoctor: 10,
       vatRateHealth: 10,
-      reportEmail: ''
+      reportEmail: '',
+      bankInfo: ''
   });
 
   useEffect(() => {
@@ -198,6 +199,20 @@ const Settings = () => {
                     <label className="block text-sm font-medium text-slate-400 mb-2">Sağlık KDV (%)</label>
                     <input type="number" min="0" value={globalSettings.vatRateHealth} onChange={e => setGlobalSettings(p => ({...p, vatRateHealth: Number(e.target.value)}))} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white" />
                 </div>
+              </div>
+
+              <div className="border-t border-slate-700 pt-4">
+                <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                    <Landmark className="w-4 h-4 text-emerald-500" /> 
+                    Banka & IBAN Bilgisi (Kopyalama Metni İçin)
+                </label>
+                <textarea 
+                    rows={3}
+                    value={globalSettings.bankInfo}
+                    onChange={e => setGlobalSettings(p => ({...p, bankInfo: e.target.value}))}
+                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500 resize-none font-mono text-sm"
+                    placeholder="Banka bilgilerinizi buraya girin..."
+                />
               </div>
 
               <div className="flex justify-end">
