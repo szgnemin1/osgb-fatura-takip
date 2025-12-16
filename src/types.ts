@@ -7,14 +7,25 @@ export interface Firm {
   extraPersonFee: number; // Ekstra Kişi Ücreti (Limit aşımı veya düşümü için)
   defaultInvoiceType: InvoiceType;
   
+  // Yıllık Ücret
+  yearlyFee?: number; // Yılda bir kez alınacak ücret
+  
   // E-Arşiv Özel Bilgileri
   taxNumber?: string;
   address?: string;
   
-  // Yeni Fiyatlandırma Özellikleri
+  // Fiyatlandırma Modeli 1 (Ana)
   pricingModel: PricingModel;
   tolerancePercentage?: number; // Toleranslı model için % (Örn: 10)
   tiers?: PricingTier[]; // Kademeli model için aralıklar
+
+  // Fiyatlandırma Modeli 2 (Opsiyonel / Ek Hizmet)
+  hasSecondaryModel?: boolean;
+  secondaryPricingModel?: PricingModel;
+  secondaryBaseFee?: number;
+  secondaryExtraPersonFee?: number;
+  secondaryBasePersonLimit?: number;
+  secondaryTiers?: PricingTier[];
 }
 
 export enum PricingModel {
@@ -66,7 +77,9 @@ export interface Transaction {
   // Hesaplama detaylarını saklamak için (Historical data)
   calculatedDetails?: {
     employeeCount: number;
-    extraItemAmount: number;
+    extraItemAmount: number; // Sağlık Ücreti
+    yearlyFeeAmount?: number; // Eklenen Yıllık Ücret
+    serviceAmount?: number; // Hakedişe konu olan saf hizmet bedeli
     expertShare: number;
     doctorShare: number;
   };
@@ -76,6 +89,7 @@ export interface PreparationItem {
   firmId: string;
   currentEmployeeCount: number;
   extraItemAmount: number;
+  addYearlyFee?: boolean; // Bu ay yıllık ücret eklensin mi?
 }
 
 export interface LogEntry {

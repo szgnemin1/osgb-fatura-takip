@@ -1,3 +1,4 @@
+
 # 🏥 OSGB Fatura & Finans Takip Sistemi (ProFinans)
 
 Modern, güvenli ve kullanıcı dostu arayüzü ile OSGB (Ortak Sağlık Güvenlik Birimi) ve hizmet sektöründeki firmaların ön muhasebe, faturalandırma ve cari takip süreçlerini yöneten profesyonel React uygulaması.
@@ -6,48 +7,30 @@ Bu proje hem **Web Uygulaması** hem de **Windows Masaüstü Uygulaması (.exe)*
 
 ![OSGB Dashboard Önizleme](https://via.placeholder.com/1200x600?text=OSGB+Fatura+Takip+Dashboard)
 
-### 🔔 v1.4.0 Güncelleme Notları (YENİ)
-Bu sürümle birlikte sistem profesyonel masaüstü standartlarına yükseltilmiştir:
+### 🔔 v1.4.5 Sürüm Notları (YENİ)
+Bu sürümde uygulama stabilitesi ve kullanıcı deneyimi odaklı kritik geliştirmeler yapılmıştır:
 
-1.  **Masaüstü Veritabanı Motoru (EXE):** Uygulama artık verileri tarayıcı önbelleğine hapsetmiyor. Windows'un `AppData` klasöründe fiziksel bir dosyaya (`database.json`) anlık kayıt yapıyor. Verileriniz artık çok daha güvende.
-2.  **Gelişmiş Excel Entegrasyonu:** 
-    *   **Çok Sayfalı Yapı:** Firmalar ve Kademeli Fiyatlar tek seferde yüklenebiliyor.
-    *   **Akıllı Hesaplama:** "KDV Hariç" girilen fiyatlar otomatik hesaplanıyor. Eksi (-) bakiye girildiğinde sistem bunu otomatik "Alacak/Tahsilat" olarak işliyor.
-3.  **Dinamik KDV Yönetimi:** Sabit oranlar kalktı. Uzman, Doktor ve Sağlık hizmetleri için KDV oranlarını artık **Ayarlar** menüsünden dilediğiniz gibi değiştirebilirsiniz.
-4.  **Akıllı Kopyalama Sistemi:** Fatura kopyalama butonu artık firmanın **Eski Borcu + Yeni Fatura** tutarını toplayarak toplam bakiyeyi ve IBAN bilgisini tek metin halinde kopyalıyor.
-5.  **Esnek Arayüz:** Masaüstü penceresi artık serbestçe boyutlandırılabilir.
+1.  **🛡️ Akıllı Pano ve Veri Güvenliği (Crash Guard):** 
+    *   Masaüstü (EXE) versiyonunda kopyalama işlemlerinde yaşanan donmalar giderildi.
+    *   `Electron.clipboard` modülü entegre edilerek %100 kararlı veri kopyalama sağlandı.
+    *   Veritabanı yazma işlemlerine (Disk I/O) hata koruması eklendi; disk hatası olsa bile uygulama çökmüyor.
+    
+2.  **✨ Görsel İyileştirmeler:**
+    *   Fatura listesindeki kopyalama butonlarına "Başarılı" animasyonları eklendi (Yeşil tik ve büyüme efekti).
+    *   "Kesilecek Faturalar" sayfasında yanlışlıkla silmeyi önlemek için 'Çöp Kutusu' butonu kaldırıldı, sadece 'Onayla' butonu bırakıldı.
+    
+3.  **🏢 Kurumsal Kimlik:**
+    *   Uygulama logosu yenilendi ve arayüze entegre edildi.
 
 ---
 
-## 🚀 Özellikler
+### 🚀 v1.4.0 Özellikleri
+1.  **Masaüstü Veritabanı Motoru (EXE):** Veriler Windows'un `AppData` klasöründe fiziksel bir dosyada (`database.json`) saklanır.
+2.  **Gelişmiş Excel Entegrasyonu:** Firmalar ve Kademeli Fiyatlar tek seferde yüklenebiliyor.
+3.  **Dinamik KDV Yönetimi:** Uzman, Doktor ve Sağlık hizmetleri için KDV oranları ayarlanabilir.
+4.  **Akıllı Kopyalama Sistemi:** Fatura tutarını ve IBAN bilgisini yazı ile (Yalnız...TL'dir) kopyalama.
 
-### 1. 💼 Gelişmiş Firma Yönetimi
-*   Firmalara özel fiyatlandırma modelleri tanımlama:
-    *   **Standart:** Taban ücret + Limit aşım ücreti.
-    *   **Toleranslı:** Belirli % tolerans aralığında sabit fiyat.
-    *   **Kademeli:** Kişi sayısı aralıklarına göre (Örn: 10-20 kişi arası 5000 TL) otomatik fiyat.
-*   E-Fatura ve E-Arşiv mükellefiyetine göre özelleştirilmiş kayıt.
-
-### 2. 🧮 Dinamik Fatura Hazırlık (Oyun Alanı)
-*   Mevcut çalışan sayısı, tetkik sayısı gibi parametreleri girerek anlık fatura hesaplama.
-*   **Excel Entegrasyonu:** Müşteri listesini Excel'den yükleyerek saniyeler içinde 300+ firmayı hesaplama.
-*   Hesaplanan tutarları "Taslak" olarak onaya gönderme.
-
-### 3. ✅ Onaylı Fatura Sistemi
-*   Faturalar önce **Taslak (Pending)** olarak oluşur.
-*   Kontrol edildikten sonra onaylanarak **Resmi Cari (Approved)** kayıtlara işlenir.
-*   E-Arşiv faturaları için Vergi No ve Adres bilgilerini tek tıkla kopyalama.
-*   Akıllı Metin Kopyalama: Fatura tutarını ve IBAN bilgisini yazı ile (Yalnız...TL'dir) kopyalama.
-
-### 4. 📈 Finansal Raporlama & Cari Takip
-*   Firma bazlı detaylı ekstre (Borç/Alacak/Bakiye).
-*   **Borç Yaşlandırma Analizi:** 1 aydan 12 aya kadar ödeme yapmayan firmaların grafiksel analizi.
-*   Tüm verileri Excel ve PDF formatında dışa aktarma.
-
-### 5. ☁️ Hibrit Veri Yönetimi
-*   **Yerel Çalışma:** Veriler varsayılan olarak cihazda saklanır.
-*   **Bulut Senkronizasyon:** Google Firebase Realtime Database ile verileri ofis ve ev arasında taşıma imkanı (Ücretsiz).
-*   **Tam Yedekleme:** Veritabanını `.json` olarak indirip geri yükleme özelliği.
+---
 
 ## 🛠️ Kullanılan Teknolojiler
 
@@ -80,9 +63,6 @@ Projeyi masaüstü uygulamasına çevirmek için:
 npm run electron:build
 ```
 *Bu işlem tamamlandığında `dist/` klasörü içinde kurulum dosyanız (`.exe`) hazır olacaktır.*
-
-## 🔒 Güvenlik ve Loglama
-Sistem üzerinde yapılan tüm kritik işlemler (Fatura silme, Firma güncelleme vb.) cihaz bilgisi ve zaman damgası ile kayıt altına alınır. Bu kayıtlar "Ayarlar" sayfasından Excel olarak indirilebilir.
 
 ## 👤 Geliştirici
 

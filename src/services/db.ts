@@ -1,3 +1,4 @@
+
 import { Firm, Transaction, TransactionType, PreparationItem, InvoiceType, GlobalSettings, PricingModel, LogEntry, PricingTier } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -19,16 +20,21 @@ const STORAGE_KEYS = {
 let fs: any;
 let path: any;
 let dbFilePath: string = '';
-const isElectron = navigator.userAgent.toLowerCase().includes('electron');
+// isElectron kontrolünü daha güvenli yap
+const isElectron = typeof window !== 'undefined' && (window as any).process && (window as any).process.type === 'renderer';
 
 if (isElectron) {
   try {
     // Electron ortamında node modüllerini yükle
-    fs = (window as any).require('fs');
-    path = (window as any).require('path');
+    // window.require kullanarak webpack'in polyfill yapmasını engelliyoruz
+    const requireFunc = (window as any).require;
+    fs = requireFunc('fs');
+    path = requireFunc('path');
+    const proc = (window as any).process;
     
     // Windows: %APPDATA%/OSGB Fatura Takip/database.json
-    const appData = process.env.APPDATA || ((process as any).platform === 'darwin' ? process.env.HOME + '/Library/Preferences' : process.env.HOME + "/.local/share");
+    // Mac/Linux desteği de eklenmiş durumda
+    const appData = proc.env.APPDATA || (proc.platform === 'darwin' ? proc.env.HOME + '/Library/Preferences' : proc.env.HOME + "/.local/share");
     const dir = path.join(appData, 'OSGB Fatura Takip');
     
     // Klasör yoksa oluştur
@@ -38,7 +44,7 @@ if (isElectron) {
     
     dbFilePath = path.join(dir, 'database.json');
   } catch (e) {
-    console.error("Electron fs modülü yüklenemedi:", e);
+    console.error("Electron fs modülü yüklenemedi veya yol oluşturulamadı:", e);
   }
 }
 
@@ -55,16 +61,18 @@ const getStorage = <T>(key: string, defaultValue: T): T => {
 
 const setStorage = <T>(key: string, value: T) => {
   try {
-    // 1. Tarayıcı hafızasına yaz (Hızlı Erişim)
+    // 1. ÖNCE Tarayıcı hafızasına yaz (Bu her zaman çalışmalı)
     const jsonValue = JSON.stringify(value);
     localStorage.setItem(key, jsonValue);
 
-    // 2. Eğer Masaüstü Uygulamasıysa (EXE), fiziksel dosyaya yaz
+    // 2. SONRA Eğer Masaüstü Uygulamasıysa (EXE), fiziksel dosyaya yaz
+    // Bunu try-catch içine alıyoruz ki dosya hatası olursa program durmasın
     if (isElectron && fs && dbFilePath) {
        saveToDisk();
     }
   } catch (e) {
     console.error('Storage write error', e);
+    alert('Veri kaydedilirken bir hata oluştu: ' + e);
   }
 };
 
@@ -74,12 +82,15 @@ const saveToDisk = () => {
         const fullData: any = {};
         // Tüm anahtarları topla
         Object.values(STORAGE_KEYS).forEach(k => {
-            fullData[k] = localStorage.getItem(k); // Raw string olarak al
+            const item = localStorage.getItem(k);
+            if(item) fullData[k] = item;
         });
         
         fs.writeFileSync(dbFilePath, JSON.stringify(fullData, null, 2));
     } catch (e) {
         console.error("Diske yazma hatası:", e);
+        // Kullanıcıyı rahatsız etmemek için alert vermiyoruz, console'a basıyoruz.
+        // Veri zaten localStorage'da güvende.
     }
 };
 
@@ -132,11 +143,11 @@ export const db = {
   // Global Settings
   getGlobalSettings: (): GlobalSettings => {
     return getStorage<GlobalSettings>(STORAGE_KEYS.GLOBAL_SETTINGS, {
-      expertPercentage: 60,
-      doctorPercentage: 40,
-      vatRateExpert: 20,
-      vatRateDoctor: 10,
-      vatRateHealth: 10,
+      expertPercentage: 25, // Kullanıcı isteği: 25
+      doctorPercentage: 75, // Kullanıcı isteği: 75
+      vatRateExpert: 20,    // Kullanıcı isteği: %20 KDV
+      vatRateDoctor: 10,    // Kullanıcı isteği: %10 KDV
+      vatRateHealth: 10,    // Kullanıcı isteği: %10 KDV
       reportEmail: '',
       bankInfo: 'Yeni Banka Hesap Bilgilerimiz; CANKAYA ORTAK SAĞLIK GÜV.BİR.SAN.TİC.LTD.ŞTİ. TR12 0015 7000 0000 0157 3026 68'
     });
@@ -173,6 +184,13 @@ export const db = {
     const updated = firms.filter(f => f.id !== id);
     setStorage(STORAGE_KEYS.FIRMS, updated);
     db.addLog('Firma Silindi', `Firma: ${firmToDelete?.name || id}`);
+  },
+
+  deleteFirmsBulk: (ids: string[]) => {
+      const firms = getStorage<Firm[]>(STORAGE_KEYS.FIRMS, []);
+      const updated = firms.filter(f => !ids.includes(f.id));
+      setStorage(STORAGE_KEYS.FIRMS, updated);
+      db.addLog('Toplu Firma Silme', `${ids.length} adet firma silindi.`);
   },
 
   getFirmById: (id: string): Firm | undefined => {
@@ -216,6 +234,13 @@ export const db = {
     db.addLog('Fatura/İşlem Silindi', `ID: ${id}`);
   },
 
+  deleteTransactionsBulk: (ids: string[]) => {
+    const transactions = getStorage<Transaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
+    const updated = transactions.filter(t => !ids.includes(t.id));
+    setStorage(STORAGE_KEYS.TRANSACTIONS, updated);
+    db.addLog('Toplu Fatura Silme', `${ids.length} adet işlem silindi.`);
+  },
+
   // Preparation
   getPreparationItems: (): PreparationItem[] => {
     return getStorage<PreparationItem[]>(STORAGE_KEYS.PREPARATION, []);
@@ -255,7 +280,7 @@ export const db = {
       globalSettings: getStorage(STORAGE_KEYS.GLOBAL_SETTINGS, {}),
       logs: getStorage(STORAGE_KEYS.LOGS, []),
       backupDate: new Date().toISOString(),
-      version: '1.4.0'
+      version: '1.4.5'
     };
   },
 
@@ -273,6 +298,16 @@ export const db = {
       console.error("Restore failed", e);
       return false;
     }
+  },
+
+  factoryReset: () => {
+      localStorage.clear();
+      // Electron varsa dosyayı da temizle
+      if (isElectron && fs && dbFilePath) {
+          try {
+              fs.writeFileSync(dbFilePath, JSON.stringify({}));
+          } catch(e) { console.error("Reset hatası", e); }
+      }
   },
 
   bulkImportFirms: (workbook: any) => {
@@ -333,7 +368,8 @@ export const db = {
         address: row['Adres']?.toString() || '',
         pricingModel: pModel,
         tolerancePercentage: Number(row['Tolerans Yüzdesi']) || 0,
-        tiers: firmTiers
+        tiers: firmTiers,
+        yearlyFee: (Number(row['Yıllık Ücret']) || 0) * vatMultiplier
       };
 
       currentFirms.push(newFirm);
@@ -341,7 +377,6 @@ export const db = {
 
       const openingBalance = Number(row['Başlangıç Borcu']) || 0;
       
-      // NEGATİF BAKİYE KONTROLÜ (Alacak ise Tahsilat, Borç ise Fatura)
       if (openingBalance !== 0) {
         const isDebt = openingBalance > 0;
         

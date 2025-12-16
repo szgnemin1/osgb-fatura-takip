@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Building2, Calculator, Receipt, FileText, Settings, TrendingDown } from 'lucide-react';
@@ -13,8 +14,9 @@ const Sidebar = () => {
   return (
     <div className="w-64 bg-slate-900 border-r border-slate-800 h-full flex flex-col">
       <div className="p-6 border-b border-slate-800 flex items-center justify-center">
-        <h1 className="text-lg font-bold text-slate-100 tracking-wider text-center">
-          <span className="text-blue-500">OSGB</span> FATURA TAKİP
+        <h1 className="text-lg font-bold text-slate-100 tracking-wider text-center flex items-center gap-2">
+            <img src="logo.svg" alt="Logo" className="w-8 h-8" />
+            <div><span className="text-blue-500">OSGB</span> PRO</div>
         </h1>
       </div>
       
@@ -53,7 +55,7 @@ const Sidebar = () => {
       </nav>
 
       <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
-        v1.4.0 • OSGB Fatura Takip
+        v1.4.5 • OSGB Fatura Takip
       </div>
     </div>
   );

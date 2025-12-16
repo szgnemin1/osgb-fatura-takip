@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
-import { Save, Building2, CheckCircle2, Trash2, Edit, Plus, X } from 'lucide-react';
+import { Save, Building2, CheckCircle2, Trash2, Edit, Plus, X, Layers, CheckSquare, Square } from 'lucide-react';
 import { InvoiceType, Firm, PricingModel, PricingTier } from '../types';
 
 const FirmRegistration = () => {
@@ -13,21 +13,32 @@ const FirmRegistration = () => {
     defaultInvoiceType: InvoiceType.E_FATURA,
     taxNumber: '',
     address: '',
+    yearlyFee: 0,
     pricingModel: PricingModel.STANDARD,
     tolerancePercentage: 10,
-    tiers: []
+    tiers: [],
+    // İkincil Model Varsayılanları
+    hasSecondaryModel: false,
+    secondaryPricingModel: PricingModel.STANDARD,
+    secondaryBaseFee: 0,
+    secondaryBasePersonLimit: 0,
+    secondaryExtraPersonFee: 0,
+    secondaryTiers: []
   };
 
   const [formData, setFormData] = useState<Firm | Omit<Firm, 'id'>>(initialFormState);
   const [isEditing, setIsEditing] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [existingFirms, setExistingFirms] = useState<Firm[]>([]);
+  const [selectedFirms, setSelectedFirms] = useState<string[]>([]);
   
   // Tier state helpers
   const [newTier, setNewTier] = useState<PricingTier>({ min: 0, max: 0, price: 0 });
+  const [newSecTier, setNewSecTier] = useState<PricingTier>({ min: 0, max: 0, price: 0 });
 
   const loadFirms = () => {
     setExistingFirms(db.getFirms());
+    setSelectedFirms([]);
   };
 
   useEffect(() => {
@@ -35,13 +46,24 @@ const FirmRegistration = () => {
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+    const { name, value, type } = e.target;
+    
+    // Checkbox kontrolü
+    if (type === 'checkbox') {
+        setFormData(prev => ({
+            ...prev,
+            [name]: (e.target as HTMLInputElement).checked
+        }));
+        return;
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: (name === 'name' || name === 'defaultInvoiceType' || name === 'pricingModel' || name === 'taxNumber' || name === 'address') ? value : Number(value)
+      [name]: (name === 'name' || name === 'defaultInvoiceType' || name === 'pricingModel' || name === 'secondaryPricingModel' || name === 'taxNumber' || name === 'address') ? value : Number(value)
     }));
   };
 
+  // --- Tier Yönetimi (Ana Model) ---
   const handleAddTier = () => {
     if (newTier.max <= newTier.min) return alert("Maksimum değer minimumdan büyük olmalı.");
     setFormData(prev => ({
@@ -50,16 +72,28 @@ const FirmRegistration = () => {
     }));
     setNewTier({ min: newTier.max + 1, max: newTier.max + 11, price: 0 });
   };
-
   const removeTier = (index: number) => {
+    setFormData(prev => ({ ...prev, tiers: prev.tiers?.filter((_, i) => i !== index) }));
+  };
+
+  // --- Tier Yönetimi (İkincil Model) ---
+  const handleAddSecTier = () => {
+    if (newSecTier.max <= newSecTier.min) return alert("Maksimum değer minimumdan büyük olmalı.");
     setFormData(prev => ({
       ...prev,
-      tiers: prev.tiers?.filter((_, i) => i !== index)
+      secondaryTiers: [...(prev.secondaryTiers || []), newSecTier]
     }));
+    setNewSecTier({ min: newSecTier.max + 1, max: newSecTier.max + 11, price: 0 });
   };
+  const removeSecTier = (index: number) => {
+    setFormData(prev => ({ ...prev, secondaryTiers: prev.secondaryTiers?.filter((_, i) => i !== index) }));
+  };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Odak sorunu için focus
+    window.focus();
     
     if (isEditing && 'id' in formData) {
       db.updateFirm(formData as Firm);
@@ -82,9 +116,12 @@ const FirmRegistration = () => {
   };
 
   const handleDelete = (id: string, name: string) => {
+    // Odak sorunu için focus
+    window.focus();
     if (window.confirm(`${name} firmasını silmek istediğinize emin misiniz?`)) {
         db.deleteFirm(id);
         loadFirms();
+        window.focus();
     }
   };
 
@@ -93,14 +130,90 @@ const FirmRegistration = () => {
     setIsEditing(false);
   };
 
+  // --- TOPLU SİLME ---
+  const toggleSelectAll = () => {
+      if (selectedFirms.length === existingFirms.length) setSelectedFirms([]);
+      else setSelectedFirms(existingFirms.map(f => f.id));
+  };
+  const toggleSelect = (id: string) => {
+      if (selectedFirms.includes(id)) setSelectedFirms(selectedFirms.filter(s => s !== id));
+      else setSelectedFirms([...selectedFirms, id]);
+  };
+  const handleBulkDelete = () => {
+      window.focus();
+      if (selectedFirms.length === 0) return;
+      if (window.confirm(`${selectedFirms.length} adet firmayı silmek istediğinize emin misiniz?`)) {
+          db.deleteFirmsBulk(selectedFirms);
+          loadFirms();
+          window.focus();
+      }
+  };
+
+  // --- RENDER HELPERS ---
+  // Tekrarlayan model formu render'ı
+  const renderPricingFields = (prefix: '' | 'secondary', model: PricingModel, tiers: PricingTier[], tierSetter: any, tierRemover: any, newTierState: any, newTierStateSetter: any) => {
+      const getField = (f: string) => prefix ? `secondary${f.charAt(0).toUpperCase() + f.slice(1)}` : f;
+      
+      return (
+        <div className="space-y-4">
+             {(model === PricingModel.STANDARD || model === PricingModel.TOLERANCE) && (
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Taban Kişi</label>
+                        <input type="number" name={getField('basePersonLimit')} value={(formData as any)[getField('basePersonLimit')] || 0} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Taban Ücret</label>
+                        <input type="number" name={getField('baseFee')} value={(formData as any)[getField('baseFee')] || 0} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-sm" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Ekstra Kişi Başı</label>
+                        <input type="number" name={getField('extraPersonFee')} value={(formData as any)[getField('extraPersonFee')] || 0} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-white text-sm" />
+                    </div>
+                     {model === PricingModel.TOLERANCE && !prefix && (
+                         <div>
+                            <label className="block text-xs font-medium text-yellow-400 mb-1">Tolerans (%)</label>
+                            <input type="number" name="tolerancePercentage" value={formData.tolerancePercentage} onChange={handleChange} className="w-full bg-slate-900 border border-yellow-500/50 rounded px-3 py-2 text-white text-sm" />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {model === PricingModel.TIERED && (
+                <div className="bg-slate-900/50 p-3 rounded border border-slate-700">
+                    <div className="flex gap-2 items-end mb-2">
+                        <input type="number" placeholder="Min" value={newTierState.min} onChange={e => newTierStateSetter((p:any) => ({...p, min: Number(e.target.value)}))} className="w-16 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-xs" />
+                        <input type="number" placeholder="Max" value={newTierState.max} onChange={e => newTierStateSetter((p:any) => ({...p, max: Number(e.target.value)}))} className="w-16 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-xs" />
+                        <input type="number" placeholder="Fiyat" value={newTierState.price} onChange={e => newTierStateSetter((p:any) => ({...p, price: Number(e.target.value)}))} className="w-20 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-xs" />
+                        <button type="button" onClick={tierSetter} className="bg-blue-600 text-white p-1 rounded"><Plus className="w-3 h-3" /></button>
+                    </div>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                        {tiers?.map((tier, idx) => (
+                            <div key={idx} className="flex justify-between bg-slate-800 p-1.5 rounded text-xs">
+                                <span>{tier.min}-{tier.max} Kişi</span>
+                                <span className="text-blue-400">{tier.price} TL</span>
+                                <button type="button" onClick={() => tierRemover(idx)} className="text-rose-500"><X className="w-3 h-3" /></button>
+                            </div>
+                        ))}
+                    </div>
+                     <div className="mt-2 pt-2 border-t border-slate-700">
+                        <label className="block text-xs font-medium text-slate-400">Limit Dışı Ekstra</label>
+                        <input type="number" name={getField('extraPersonFee')} value={(formData as any)[getField('extraPersonFee')] || 0} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm mt-1" />
+                    </div>
+                </div>
+            )}
+        </div>
+      );
+  }
+
   return (
-    <div className="max-w-4xl mx-auto animate-in slide-in-from-right-4 duration-500 pb-12">
+    <div className="max-w-5xl mx-auto animate-in slide-in-from-right-4 duration-500 pb-12">
       <header className="mb-8">
         <h2 className="text-3xl font-bold text-slate-100 flex items-center gap-3">
           <Building2 className="w-8 h-8 text-blue-500" />
           {isEditing ? 'Firma Düzenle' : 'Firma Kayıt & Parametreler'}
         </h2>
-        <p className="text-slate-400 mt-2">Yeni firma ekleyin veya mevcut kuralları düzenleyin.</p>
+        <p className="text-slate-400 mt-2">Çoklu fiyatlandırma modelleri ve yıllık ücret tanımlamaları.</p>
       </header>
 
       {successMessage && (
@@ -110,184 +223,92 @@ const FirmRegistration = () => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-slate-800 border border-slate-700 rounded-xl p-8 shadow-xl mb-12 relative">
+      <form onSubmit={handleSubmit} className="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-xl mb-12 relative">
         {isEditing && (
-            <button 
-                type="button" 
-                onClick={handleCancelEdit} 
-                className="absolute top-4 right-4 text-slate-500 hover:text-white"
-            >
-                <X className="w-6 h-6" />
-            </button>
+            <button type="button" onClick={handleCancelEdit} className="absolute top-4 right-4 text-slate-500 hover:text-white"><X className="w-6 h-6" /></button>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* Firma Bilgileri */}
-          <div className="col-span-2">
-            <h3 className="text-lg font-semibold text-slate-200 mb-4 border-b border-slate-700 pb-2">Genel Bilgiler</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Firma Adı</label>
-                <input 
-                  required
-                  type="text" 
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="Örn: ABC İnşaat Ltd. Şti."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Fatura Tipi</label>
-                <select
-                  name="defaultInvoiceType"
-                  value={formData.defaultInvoiceType}
-                  onChange={handleChange}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                >
-                  <option value={InvoiceType.E_FATURA}>E-Fatura</option>
-                  <option value={InvoiceType.E_ARSIV}>E-Arşiv</option>
-                </select>
-              </div>
-            </div>
-
-            {/* E-ARŞİV EKSTRA ALANLAR */}
-            {formData.defaultInvoiceType === InvoiceType.E_ARSIV && (
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-orange-500/5 border border-orange-500/20 rounded-lg animate-in fade-in">
-                     <div>
-                        <label className="block text-sm font-medium text-orange-400 mb-2">Vergi Numarası (VKN/TCKN)</label>
-                        <input 
-                            type="text" 
-                            name="taxNumber" 
-                            value={formData.taxNumber || ''} 
-                            onChange={handleChange} 
-                            className="w-full bg-slate-900 border border-slate-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-orange-500 outline-none"
-                            placeholder="11111111111"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-orange-400 mb-2">Adres</label>
-                        <textarea 
-                            name="address" 
-                            value={formData.address || ''} 
-                            onChange={handleChange} 
-                            className="w-full bg-slate-900 border border-slate-600 rounded px-4 py-2 text-white focus:ring-2 focus:ring-orange-500 outline-none h-10 resize-none overflow-hidden"
-                            placeholder="Açık adres..."
-                        />
-                    </div>
-                </div>
-            )}
-          </div>
-
-          <div className="col-span-2 border-t border-slate-700 my-2"></div>
-
-          {/* Fiyatlandırma Modeli Seçimi */}
-          <div className="col-span-2">
-            <h3 className="text-lg font-semibold text-blue-400 mb-4">Fiyatlandırma Modeli</h3>
-            <div className="grid grid-cols-3 gap-4">
-                {[
-                    { val: PricingModel.STANDARD, label: 'Standart (Taban + Ekstra)' },
-                    { val: PricingModel.TOLERANCE, label: 'Toleranslı (Yüzde)' },
-                    { val: PricingModel.TIERED, label: 'Kademeli (Aralık)' }
-                ].map(opt => (
-                    <button
-                        key={opt.val}
-                        type="button"
-                        onClick={() => setFormData(prev => ({ ...prev, pricingModel: opt.val }))}
-                        className={`p-3 rounded-lg border text-sm font-medium transition-colors ${
-                            formData.pricingModel === opt.val 
-                            ? 'bg-blue-600 border-blue-500 text-white' 
-                            : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800'
-                        }`}
-                    >
-                        {opt.label}
-                    </button>
-                ))}
-            </div>
-          </div>
-
-          {/* Dinamik Alanlar */}
-          <div className="col-span-2 space-y-6">
+          {/* SOL: TEMEL BİLGİLER */}
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">Genel Bilgiler</h3>
             
-            {/* STANDART & TOLERANS ORTAK ALANLARI */}
-            {(formData.pricingModel === PricingModel.STANDARD || formData.pricingModel === PricingModel.TOLERANCE) && (
-                <div className="grid grid-cols-2 gap-6 p-4 bg-slate-900/50 rounded-lg border border-slate-700">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Taban Kişi Limiti</label>
-                        <input type="number" name="basePersonLimit" value={formData.basePersonLimit} onChange={handleChange} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Taban Fiyat (TL)</label>
-                        <input type="number" name="baseFee" value={formData.baseFee} onChange={handleChange} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">Ekstra Kişi Başı Ücret (TL)</label>
-                        <input type="number" name="extraPersonFee" value={formData.extraPersonFee} onChange={handleChange} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white" />
-                        <p className="text-xs text-slate-500 mt-1">Limit dışına çıkılırsa eklenecek/düşülecek tutar.</p>
-                    </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Firma Adı</label>
+                <input required type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Örn: ABC İnşaat Ltd. Şti." className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-1">Fatura Tipi</label>
+                    <select name="defaultInvoiceType" value={formData.defaultInvoiceType} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value={InvoiceType.E_FATURA}>E-Fatura</option>
+                    <option value={InvoiceType.E_ARSIV}>E-Arşiv</option>
+                    </select>
+                </div>
+                 <div>
+                    <label className="block text-sm font-medium text-purple-400 mb-1">Yıllık İşlem Ücreti</label>
+                    <input type="number" name="yearlyFee" value={formData.yearlyFee} onChange={handleChange} className="w-full bg-slate-900 border border-purple-500/30 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-purple-500 outline-none" />
+                </div>
+              </div>
 
-                    {/* TOLERANS ÖZEL */}
-                    {formData.pricingModel === PricingModel.TOLERANCE && (
-                         <div>
-                            <label className="block text-sm font-medium text-yellow-400 mb-2">Tolerans Yüzdesi (%)</label>
-                            <input type="number" name="tolerancePercentage" value={formData.tolerancePercentage} onChange={handleChange} className="w-full bg-slate-800 border border-yellow-500/50 rounded px-3 py-2 text-white" />
-                            <p className="text-xs text-slate-500 mt-1">Bu % aralığında (Alt/Üst) fiyat değişmez.</p>
+               {/* E-ARŞİV EKSTRA ALANLAR */}
+                {formData.defaultInvoiceType === InvoiceType.E_ARSIV && (
+                    <div className="grid grid-cols-2 gap-4 p-3 bg-orange-500/5 border border-orange-500/20 rounded-lg">
+                        <div>
+                            <label className="block text-xs font-medium text-orange-400 mb-1">Vergi No</label>
+                            <input type="text" name="taxNumber" value={formData.taxNumber || ''} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm" />
                         </div>
+                        <div>
+                            <label className="block text-xs font-medium text-orange-400 mb-1">Adres</label>
+                            <textarea name="address" value={formData.address || ''} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm h-8 resize-none overflow-hidden" />
+                        </div>
+                    </div>
+                )}
+            </div>
+          </div>
+
+          {/* SAĞ: FİYATLANDIRMA MODELLERİ */}
+          <div className="space-y-6">
+             <h3 className="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">Fiyatlandırma Kurgusu</h3>
+             
+             {/* MODEL 1 */}
+             <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
+                <div className="flex justify-between items-center mb-3">
+                    <span className="font-bold text-blue-400 text-sm">Ana Model (Zorunlu)</span>
+                    <select name="pricingModel" value={formData.pricingModel} onChange={handleChange} className="bg-slate-900 border border-slate-600 rounded text-xs px-2 py-1 text-white outline-none">
+                        <option value={PricingModel.STANDARD}>Standart</option>
+                        <option value={PricingModel.TOLERANCE}>Toleranslı</option>
+                        <option value={PricingModel.TIERED}>Kademeli</option>
+                    </select>
+                </div>
+                {renderPricingFields('', formData.pricingModel, formData.tiers || [], handleAddTier, removeTier, newTier, setNewTier)}
+             </div>
+
+             {/* MODEL 2 */}
+             <div className={`p-4 rounded-lg border transition-all ${formData.hasSecondaryModel ? 'bg-slate-700/30 border-slate-600' : 'bg-slate-800 border-slate-700 opacity-60'}`}>
+                <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center gap-2">
+                        <input type="checkbox" name="hasSecondaryModel" id="secModelCheck" checked={formData.hasSecondaryModel} onChange={handleChange} className="w-4 h-4 rounded border-slate-600 text-blue-600 focus:ring-blue-500" />
+                        <label htmlFor="secModelCheck" className="font-bold text-emerald-400 text-sm cursor-pointer select-none">İkincil Model (Ek Hizmet vb.)</label>
+                    </div>
+                    {formData.hasSecondaryModel && (
+                        <select name="secondaryPricingModel" value={formData.secondaryPricingModel} onChange={handleChange} className="bg-slate-900 border border-slate-600 rounded text-xs px-2 py-1 text-white outline-none">
+                            <option value={PricingModel.STANDARD}>Standart</option>
+                            <option value={PricingModel.TIERED}>Kademeli</option>
+                        </select>
                     )}
                 </div>
-            )}
-
-            {/* KADEMELİ ÖZEL */}
-            {formData.pricingModel === PricingModel.TIERED && (
-                <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-700">
-                    <h4 className="text-sm font-bold text-slate-300 mb-4">Fiyat Aralıkları (Kademeler)</h4>
-                    
-                    <div className="flex gap-2 items-end mb-4">
-                        <div>
-                            <label className="text-xs text-slate-500">Min Kişi</label>
-                            <input type="number" value={newTier.min} onChange={e => setNewTier(p => ({...p, min: Number(e.target.value)}))} className="w-20 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-sm" />
-                        </div>
-                        <div>
-                            <label className="text-xs text-slate-500">Max Kişi</label>
-                            <input type="number" value={newTier.max} onChange={e => setNewTier(p => ({...p, max: Number(e.target.value)}))} className="w-20 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-sm" />
-                        </div>
-                        <div>
-                            <label className="text-xs text-slate-500">Fiyat (TL)</label>
-                            <input type="number" value={newTier.price} onChange={e => setNewTier(p => ({...p, price: Number(e.target.value)}))} className="w-24 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-sm" />
-                        </div>
-                        <button type="button" onClick={handleAddTier} className="bg-blue-600 hover:bg-blue-700 text-white p-1.5 rounded"><Plus className="w-4 h-4" /></button>
-                    </div>
-
-                    <div className="space-y-2">
-                        {formData.tiers?.map((tier, idx) => (
-                            <div key={idx} className="flex items-center justify-between bg-slate-800 p-2 rounded border border-slate-700 text-sm">
-                                <span>{tier.min} - {tier.max} Kişi Arası</span>
-                                <span className="font-bold text-blue-400">{tier.price} TL</span>
-                                <button type="button" onClick={() => removeTier(idx)} className="text-rose-500 hover:text-rose-400"><Trash2 className="w-4 h-4" /></button>
-                            </div>
-                        ))}
-                         {(!formData.tiers || formData.tiers.length === 0) && <p className="text-xs text-slate-500">Henüz aralık eklenmedi.</p>}
-                    </div>
-
-                    <div className="mt-4 border-t border-slate-700 pt-3">
-                         <label className="block text-sm font-medium text-slate-300 mb-2">Limit Dışı Ekstra Ücret</label>
-                         <input type="number" name="extraPersonFee" value={formData.extraPersonFee} onChange={handleChange} className="w-full bg-slate-800 border border-slate-600 rounded px-3 py-2 text-white" />
-                         <p className="text-xs text-slate-500 mt-1">En üst kademeyi aşan veya en alt kademenin altına düşen her kişi için.</p>
-                    </div>
-                </div>
-            )}
+                {formData.hasSecondaryModel && renderPricingFields('secondary', formData.secondaryPricingModel || PricingModel.STANDARD, formData.secondaryTiers || [], handleAddSecTier, removeSecTier, newSecTier, setNewSecTier)}
+             </div>
 
           </div>
 
         </div>
 
         <div className="mt-8 pt-6 border-t border-slate-700 flex justify-end">
-          <button 
-            type="submit" 
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-all shadow-lg hover:shadow-blue-600/30"
-          >
+          <button type="submit" className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-all shadow-lg hover:shadow-blue-600/30">
             <Save className="w-5 h-5" />
             {isEditing ? 'Güncelle' : 'Kaydet'}
           </button>
@@ -295,30 +316,54 @@ const FirmRegistration = () => {
       </form>
 
       {/* Kayıtlı Firmalar Listesi */}
-      <div className="bg-slate-800 border border-slate-700 rounded-xl p-8 shadow-xl">
-        <h3 className="text-xl font-bold text-slate-200 mb-6">Kayıtlı Firmalar</h3>
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-xl">
+        <div className="flex justify-between items-center mb-4">
+             <h3 className="text-xl font-bold text-slate-200">Kayıtlı Firmalar</h3>
+             {selectedFirms.length > 0 && (
+                 <button onClick={handleBulkDelete} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors animate-in zoom-in">
+                     <Trash2 className="w-4 h-4" />
+                     Seçilenleri Sil ({selectedFirms.length})
+                 </button>
+             )}
+        </div>
+        
         <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-900 border-b border-slate-700">
+                        <th className="p-4 w-10">
+                            <button onClick={toggleSelectAll} className="text-slate-400 hover:text-white">
+                                {selectedFirms.length === existingFirms.length && existingFirms.length > 0 ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                            </button>
+                        </th>
                         <th className="p-4 text-slate-400">Firma Adı</th>
-                        <th className="p-4 text-slate-400">Tip</th>
                         <th className="p-4 text-slate-400">Model</th>
                         <th className="p-4 text-slate-400 text-right">Taban Fiyat</th>
+                        <th className="p-4 text-slate-400 text-right">Yıllık Ücret</th>
+                        <th className="p-4 text-slate-400 text-center">Ek Model</th>
                         <th className="p-4 text-slate-400 text-center">İşlem</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700">
                     {existingFirms.map(firm => (
-                        <tr key={firm.id} className="hover:bg-slate-700/50">
+                        <tr key={firm.id} className={`hover:bg-slate-700/50 ${selectedFirms.includes(firm.id) ? 'bg-blue-900/20' : ''}`}>
+                             <td className="p-4 text-center">
+                                <button onClick={() => toggleSelect(firm.id)} className="text-slate-500 hover:text-blue-400">
+                                    {selectedFirms.includes(firm.id) ? <CheckSquare className="w-5 h-5 text-blue-500" /> : <Square className="w-5 h-5" />}
+                                </button>
+                            </td>
                             <td className="p-4 text-slate-200 font-medium">{firm.name}</td>
                             <td className="p-4 text-slate-400 text-sm">
-                                <span className={`px-2 py-1 rounded text-xs ${firm.defaultInvoiceType === InvoiceType.E_ARSIV ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                                    {firm.defaultInvoiceType}
-                                </span>
+                                <div className="flex flex-col">
+                                    <span>{firm.pricingModel}</span>
+                                    <span className="text-xs text-slate-500">{firm.defaultInvoiceType}</span>
+                                </div>
                             </td>
-                            <td className="p-4 text-slate-400 text-sm">{firm.pricingModel}</td>
                             <td className="p-4 text-slate-400 text-right">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(firm.baseFee)}</td>
+                            <td className="p-4 text-purple-400 text-right text-sm">{firm.yearlyFee ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(firm.yearlyFee) : '-'}</td>
+                            <td className="p-4 text-center">
+                                {firm.hasSecondaryModel ? <Layers className="w-5 h-5 text-emerald-500 mx-auto" title="İkincil Model Aktif" /> : <span className="text-slate-600">-</span>}
+                            </td>
                             <td className="p-4 text-center">
                                 <div className="flex items-center justify-center gap-2">
                                      <button 
@@ -328,17 +373,11 @@ const FirmRegistration = () => {
                                     >
                                         <Edit className="w-5 h-5" />
                                     </button>
-                                    <button 
-                                        onClick={() => handleDelete(firm.id, firm.name)}
-                                        className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
-                                        title="Sil"
-                                    >
-                                        <Trash2 className="w-5 h-5" />
-                                    </button>
                                 </div>
                             </td>
                         </tr>
                     ))}
+                    {existingFirms.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-slate-500">Kayıtlı firma bulunamadı.</td></tr>}
                 </tbody>
             </table>
         </div>
