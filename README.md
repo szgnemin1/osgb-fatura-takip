@@ -7,28 +7,36 @@ Bu proje hem **Web Uygulaması** hem de **Windows Masaüstü Uygulaması (.exe)*
 
 ![OSGB Dashboard Önizleme](https://via.placeholder.com/1200x600?text=OSGB+Fatura+Takip+Dashboard)
 
-### 🔔 v1.4.5 Sürüm Notları (YENİ)
-Bu sürümde uygulama stabilitesi ve kullanıcı deneyimi odaklı kritik geliştirmeler yapılmıştır:
+### 🔔 v1.4.6 Sürüm Notları (YENİ)
 
-1.  **🛡️ Akıllı Pano ve Veri Güvenliği (Crash Guard):** 
-    *   Masaüstü (EXE) versiyonunda kopyalama işlemlerinde yaşanan donmalar giderildi.
-    *   `Electron.clipboard` modülü entegre edilerek %100 kararlı veri kopyalama sağlandı.
-    *   Veritabanı yazma işlemlerine (Disk I/O) hata koruması eklendi; disk hatası olsa bile uygulama çökmüyor.
-    
-2.  **✨ Görsel İyileştirmeler:**
-    *   Fatura listesindeki kopyalama butonlarına "Başarılı" animasyonları eklendi (Yeşil tik ve büyüme efekti).
-    *   "Kesilecek Faturalar" sayfasında yanlışlıkla silmeyi önlemek için 'Çöp Kutusu' butonu kaldırıldı, sadece 'Onayla' butonu bırakıldı.
-    
-3.  **🏢 Kurumsal Kimlik:**
-    *   Uygulama logosu yenilendi ve arayüze entegre edildi.
+Bu sürümde uygulama dağıtımı ve raporlama altyapısında önemli geliştirmeler yapılmıştır:
+
+1.  **🚀 Otomatik Güncelleme Sistemi (Auto-Update):**
+    *   Uygulama artık GitHub üzerinden yeni sürümleri otomatik olarak denetler.
+    *   Yeni bir güncelleme bulunduğunda arka planda indirilir ve kullanıcıya sağ alt köşede şık bir bildirim gösterilir.
+    *   Tek tıkla yeniden başlatılarak güncelleme kurulur.
+
+2.  **📅 Gelişmiş Tarih Filtreleme & Devreden Bakiye:**
+    *   **Cari Detay (Ekstre)** sayfasına "Başlangıç" ve "Bitiş" tarih filtreleri eklendi.
+    *   Seçilen başlangıç tarihinden önceki hareketler hesaplanarak listenin en başına **"DEVREDEN BAKİYE"** satırı olarak eklenir.
+    *   Alt kısımdaki toplamlar ve "Genel Bakiye" artık seçili tarih aralığını ve devreden bakiyeyi dikkate alarak dinamik hesaplanır.
+
+3.  **📊 Excel Raporlama İyileştirmeleri:**
+    *   Firma ekstreleri Excel'e aktarılırken artık tarih aralığı başlıkta belirtilir.
+    *   Devreden bakiye satırı Excel raporuna dahil edilerek muhasebe standartlarına uygun çıktı üretilir.
 
 ---
 
-### 🚀 v1.4.0 Özellikleri
-1.  **Masaüstü Veritabanı Motoru (EXE):** Veriler Windows'un `AppData` klasöründe fiziksel bir dosyada (`database.json`) saklanır.
-2.  **Gelişmiş Excel Entegrasyonu:** Firmalar ve Kademeli Fiyatlar tek seferde yüklenebiliyor.
-3.  **Dinamik KDV Yönetimi:** Uzman, Doktor ve Sağlık hizmetleri için KDV oranları ayarlanabilir.
-4.  **Akıllı Kopyalama Sistemi:** Fatura tutarını ve IBAN bilgisini yazı ile (Yalnız...TL'dir) kopyalama.
+### ⭐ Genel Özellikler
+
+*   **Dinamik Hakediş Hesaplama:** Çalışan sayısı, taban limit, ekstra kişi ücreti ve farklı fiyatlandırma modellerine (Standart, Toleranslı, Kademeli) göre otomatik fatura tutarı hesaplama.
+*   **Çoklu Fiyatlandırma Modeli:** Her firma için farklı kurallar (Örn: 0-10 kişi sabit fiyat, 10-50 kişi kademeli fiyat vb.) tanımlayabilme.
+*   **Fatura & Tahsilat Yönetimi:** Taslak fatura oluşturma, onaylama, manuel borç/alacak ekleme ve tahsilat takibi.
+*   **Akıllı Kopyalama:** Fatura tutarlarını ve metinlerini "Yazı ile (Yalnız...TL'dir)" formatında tek tıkla kopyalama.
+*   **Borç Yaşlandırma Analizi:** Hangi firmanın ne kadar süredir (1-12+ Ay) ödeme yapmadığını grafiksel olarak gösteren analiz ekranı.
+*   **Masaüstü Veritabanı (EXE):** Windows uygulamasında veriler yerel diskte (`database.json`) güvenle saklanır, veri kaybı yaşanmaz.
+*   **Bulut Yedekleme (Opsiyonel):** Google Firebase entegrasyonu ile verileri şifreli olarak buluta yedekleme ve farklı cihazlara aktarma imkanı.
+*   **Excel Entegrasyonu:** Firmaları toplu içeri aktarma (Import) ve raporları dışarı aktarma (Export) özellikleri.
 
 ---
 
@@ -36,11 +44,11 @@ Bu sürümde uygulama stabilitesi ve kullanıcı deneyimi odaklı kritik gelişt
 
 *   **Core:** React 18, TypeScript, Hooks
 *   **Styling:** Tailwind CSS (Dark Mode Optimized)
-*   **Desktop Engine:** Electron.js
+*   **Desktop Engine:** Electron.js, Electron Updater
 *   **Charts:** Recharts
 *   **Data Handling:** XLSX (Excel), jsPDF (PDF Generation)
 *   **Icons:** Lucide React
-*   **Deployment:** Vercel / Netlify / Electron Builder
+*   **Deployment:** GitHub Releases (Auto Update)
 
 ## 📦 Kurulum ve Çalıştırma
 
@@ -58,19 +66,17 @@ npm start
 ```
 
 ### 3. Windows Uygulaması (.exe) Oluşturma
-Projeyi masaüstü uygulamasına çevirmek için:
+Projeyi masaüstü uygulamasına çevirmek ve GitHub'a yayınlamak için:
 ```bash
 npm run electron:build
 ```
-*Bu işlem tamamlandığında `dist/` klasörü içinde kurulum dosyanız (`.exe`) hazır olacaktır.*
+*Bu işlem `dist/` klasöründe kurulum dosyasını oluşturur ve `electron-updater` yapılandırmasına göre GitHub Releases sayfasına taslak sürüm çıkarır.*
 
 ## 👤 Geliştirici
 
 **Emin Sezgin**
 *   [GitHub](https://github.com/szgnemin1)
 *   [LinkedIn](https://www.linkedin.com/in/szgnemin)
-*   [Instagram](https://www.instagram.com/szgn_emin/)
-*   [X (Twitter)](https://x.com/szgn_emin)
 
 ---
 *Bu proje açık kaynak lisansı ile paylaşılmıştır.*

@@ -1,3 +1,4 @@
+
 import { Firm, Transaction, TransactionType, PreparationItem, InvoiceType, GlobalSettings, PricingModel, LogEntry, PricingTier, ServiceType } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -280,7 +281,7 @@ export const db = {
       globalSettings: getStorage(STORAGE_KEYS.GLOBAL_SETTINGS, {}),
       logs: getStorage(STORAGE_KEYS.LOGS, []),
       backupDate: new Date().toISOString(),
-      version: '1.4.5'
+      version: '1.4.6'
     };
   },
 
