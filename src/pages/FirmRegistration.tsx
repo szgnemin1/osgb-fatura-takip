@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
-import { Save, Building2, CheckCircle2, Trash2, Edit, Plus, X, Layers, CheckSquare, Square } from 'lucide-react';
-import { InvoiceType, Firm, PricingModel, PricingTier } from '../types';
+import { Save, Building2, CheckCircle2, Trash2, Edit, Plus, X, Layers, CheckSquare, Square, Search, Network, Stethoscope } from 'lucide-react';
+import { InvoiceType, Firm, PricingModel, PricingTier, ServiceType } from '../types';
 
 const FirmRegistration = () => {
   const initialFormState: Omit<Firm, 'id'> = {
     name: '',
+    parentFirmId: '',
     basePersonLimit: 10,
     baseFee: 1000,
     extraPersonFee: 50,
@@ -17,6 +18,7 @@ const FirmRegistration = () => {
     pricingModel: PricingModel.STANDARD,
     tolerancePercentage: 10,
     tiers: [],
+    serviceType: ServiceType.BOTH, // Varsayılan: Tümü
     // İkincil Model Varsayılanları
     hasSecondaryModel: false,
     secondaryPricingModel: PricingModel.STANDARD,
@@ -32,11 +34,15 @@ const FirmRegistration = () => {
   const [existingFirms, setExistingFirms] = useState<Firm[]>([]);
   const [selectedFirms, setSelectedFirms] = useState<string[]>([]);
   
+  // Arama State
+  const [searchTerm, setSearchTerm] = useState('');
+  
   // Tier state helpers
   const [newTier, setNewTier] = useState<PricingTier>({ min: 0, max: 0, price: 0 });
   const [newSecTier, setNewSecTier] = useState<PricingTier>({ min: 0, max: 0, price: 0 });
 
   const loadFirms = () => {
+    // db.getFirms() zaten alfabetik sıralıyor
     setExistingFirms(db.getFirms());
     setSelectedFirms([]);
   };
@@ -59,7 +65,7 @@ const FirmRegistration = () => {
 
     setFormData(prev => ({
       ...prev,
-      [name]: (name === 'name' || name === 'defaultInvoiceType' || name === 'pricingModel' || name === 'secondaryPricingModel' || name === 'taxNumber' || name === 'address') ? value : Number(value)
+      [name]: (name === 'name' || name === 'defaultInvoiceType' || name === 'pricingModel' || name === 'secondaryPricingModel' || name === 'taxNumber' || name === 'address' || name === 'parentFirmId' || name === 'serviceType') ? value : Number(value)
     }));
   };
 
@@ -92,7 +98,6 @@ const FirmRegistration = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Odak sorunu için focus
     window.focus();
     
     if (isEditing && 'id' in formData) {
@@ -116,7 +121,6 @@ const FirmRegistration = () => {
   };
 
   const handleDelete = (id: string, name: string) => {
-    // Odak sorunu için focus
     window.focus();
     if (window.confirm(`${name} firmasını silmek istediğinize emin misiniz?`)) {
         db.deleteFirm(id);
@@ -132,8 +136,8 @@ const FirmRegistration = () => {
 
   // --- TOPLU SİLME ---
   const toggleSelectAll = () => {
-      if (selectedFirms.length === existingFirms.length) setSelectedFirms([]);
-      else setSelectedFirms(existingFirms.map(f => f.id));
+      if (selectedFirms.length === filteredFirms.length) setSelectedFirms([]);
+      else setSelectedFirms(filteredFirms.map(f => f.id));
   };
   const toggleSelect = (id: string) => {
       if (selectedFirms.includes(id)) setSelectedFirms(selectedFirms.filter(s => s !== id));
@@ -149,8 +153,9 @@ const FirmRegistration = () => {
       }
   };
 
+  const filteredFirms = existingFirms.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
   // --- RENDER HELPERS ---
-  // Tekrarlayan model formu render'ı
   const renderPricingFields = (prefix: '' | 'secondary', model: PricingModel, tiers: PricingTier[], tierSetter: any, tierRemover: any, newTierState: any, newTierStateSetter: any) => {
       const getField = (f: string) => prefix ? `secondary${f.charAt(0).toUpperCase() + f.slice(1)}` : f;
       
@@ -239,6 +244,23 @@ const FirmRegistration = () => {
                 <label className="block text-sm font-medium text-slate-300 mb-1">Firma Adı</label>
                 <input required type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Örn: ABC İnşaat Ltd. Şti." className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
+              
+              <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1 flex items-center gap-2">
+                      <Network className="w-4 h-4 text-purple-400" />
+                      Bağlı Olduğu Ana Firma (Şube ise Seçiniz)
+                  </label>
+                  <select name="parentFirmId" value={formData.parentFirmId || ''} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-blue-500 outline-none">
+                      <option value="">-- Yok (Ana Firma) --</option>
+                      {existingFirms
+                          .filter(f => isEditing ? f.id !== (formData as Firm).id : true) // Kendini seçemesin
+                          .map(f => (
+                              <option key={f.id} value={f.id}>{f.name}</option>
+                          ))
+                      }
+                  </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-1">Fatura Tipi</label>
@@ -251,6 +273,18 @@ const FirmRegistration = () => {
                     <label className="block text-sm font-medium text-purple-400 mb-1">Yıllık İşlem Ücreti</label>
                     <input type="number" name="yearlyFee" value={formData.yearlyFee} onChange={handleChange} className="w-full bg-slate-900 border border-purple-500/30 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-purple-500 outline-none" />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-emerald-400 mb-1 flex items-center gap-2">
+                    <Stethoscope className="w-4 h-4" /> Hizmet Kapsamı
+                </label>
+                <select name="serviceType" value={formData.serviceType || ServiceType.BOTH} onChange={handleChange} className="w-full bg-slate-900 border border-emerald-500/30 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 outline-none">
+                    <option value={ServiceType.BOTH}>Tümü (Uzman + Hekim)</option>
+                    <option value={ServiceType.EXPERT_ONLY}>Sadece İş Güvenliği Uzmanı</option>
+                    <option value={ServiceType.DOCTOR_ONLY}>Sadece İşyeri Hekimi</option>
+                </select>
+                <p className="text-xs text-slate-500 mt-1">Fatura açıklaması ve hesaplama bu seçime göre yapılır.</p>
               </div>
 
                {/* E-ARŞİV EKSTRA ALANLAR */}
@@ -319,6 +353,19 @@ const FirmRegistration = () => {
       <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-xl">
         <div className="flex justify-between items-center mb-4">
              <h3 className="text-xl font-bold text-slate-200">Kayıtlı Firmalar</h3>
+             
+             {/* Arama Kutusu */}
+             <div className="relative">
+                 <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+                 <input 
+                    type="text" 
+                    placeholder="Firma Ara..." 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
+                    className="bg-slate-900 border border-slate-600 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 outline-none focus:border-blue-500"
+                 />
+             </div>
+
              {selectedFirms.length > 0 && (
                  <button onClick={handleBulkDelete} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors animate-in zoom-in">
                      <Trash2 className="w-4 h-4" />
@@ -333,26 +380,28 @@ const FirmRegistration = () => {
                     <tr className="bg-slate-900 border-b border-slate-700">
                         <th className="p-4 w-10">
                             <button onClick={toggleSelectAll} className="text-slate-400 hover:text-white">
-                                {selectedFirms.length === existingFirms.length && existingFirms.length > 0 ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
+                                {selectedFirms.length === filteredFirms.length && filteredFirms.length > 0 ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5" />}
                             </button>
                         </th>
                         <th className="p-4 text-slate-400">Firma Adı</th>
                         <th className="p-4 text-slate-400">Model</th>
                         <th className="p-4 text-slate-400 text-right">Taban Fiyat</th>
-                        <th className="p-4 text-slate-400 text-right">Yıllık Ücret</th>
-                        <th className="p-4 text-slate-400 text-center">Ek Model</th>
+                         <th className="p-4 text-slate-400 text-center">Hizmet Türü</th>
                         <th className="p-4 text-slate-400 text-center">İşlem</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700">
-                    {existingFirms.map(firm => (
+                    {filteredFirms.map(firm => (
                         <tr key={firm.id} className={`hover:bg-slate-700/50 ${selectedFirms.includes(firm.id) ? 'bg-blue-900/20' : ''}`}>
                              <td className="p-4 text-center">
                                 <button onClick={() => toggleSelect(firm.id)} className="text-slate-500 hover:text-blue-400">
                                     {selectedFirms.includes(firm.id) ? <CheckSquare className="w-5 h-5 text-blue-500" /> : <Square className="w-5 h-5" />}
                                 </button>
                             </td>
-                            <td className="p-4 text-slate-200 font-medium">{firm.name}</td>
+                            <td className="p-4 text-slate-200 font-medium">
+                                {firm.name}
+                                {firm.parentFirmId && <span className="ml-2 text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">Şube</span>}
+                            </td>
                             <td className="p-4 text-slate-400 text-sm">
                                 <div className="flex flex-col">
                                     <span>{firm.pricingModel}</span>
@@ -360,9 +409,14 @@ const FirmRegistration = () => {
                                 </div>
                             </td>
                             <td className="p-4 text-slate-400 text-right">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(firm.baseFee)}</td>
-                            <td className="p-4 text-purple-400 text-right text-sm">{firm.yearlyFee ? new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(firm.yearlyFee) : '-'}</td>
                             <td className="p-4 text-center">
-                                {firm.hasSecondaryModel ? <Layers className="w-5 h-5 text-emerald-500 mx-auto" title="İkincil Model Aktif" /> : <span className="text-slate-600">-</span>}
+                                {firm.serviceType === ServiceType.EXPERT_ONLY ? (
+                                    <span className="text-xs bg-blue-500/10 text-blue-400 px-2 py-1 rounded">Sadece Uzman</span>
+                                ) : firm.serviceType === ServiceType.DOCTOR_ONLY ? (
+                                    <span className="text-xs bg-purple-500/10 text-purple-400 px-2 py-1 rounded">Sadece Hekim</span>
+                                ) : (
+                                    <span className="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded">Tümü</span>
+                                )}
                             </td>
                             <td className="p-4 text-center">
                                 <div className="flex items-center justify-center gap-2">
@@ -377,7 +431,7 @@ const FirmRegistration = () => {
                             </td>
                         </tr>
                     ))}
-                    {existingFirms.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-slate-500">Kayıtlı firma bulunamadı.</td></tr>}
+                    {filteredFirms.length === 0 && <tr><td colSpan={7} className="p-8 text-center text-slate-500">Kayıtlı firma bulunamadı.</td></tr>}
                 </tbody>
             </table>
         </div>

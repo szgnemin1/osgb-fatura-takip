@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Transaction, TransactionType, InvoiceType, Firm } from '../types';
@@ -148,10 +149,10 @@ const SmartCopyButton = ({ inv, globalSettings, allTransactions }: { inv: Transa
                 p-2 rounded-lg transition-all duration-300 border flex items-center justify-center
                 ${copied 
                     ? 'bg-emerald-600 text-white border-emerald-500 shadow-lg shadow-emerald-500/20 scale-105' 
-                    : 'bg-blue-600/10 text-blue-400 border-blue-600/30 hover:bg-blue-600 hover:text-white'
+                    : 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:opacity-80'
                 }
             `}
-            title="Metin Kopyala"
+            title="Yazı ile Kopyala (Parlak Renk)"
         >
             {copied ? <Check className="w-4 h-4 animate-in zoom-in" /> : <ClipboardCopy className="w-4 h-4" />}
         </button>
@@ -195,6 +196,7 @@ const Invoices = () => {
         };
       });
 
+    // Alfabetik Sıralama
     setPendingInvoices(allInvoices.filter(t => t.status === 'PENDING').sort((a, b) => a.firmName.localeCompare(b.firmName)));
     setApprovedInvoices(allInvoices.filter(t => t.status === 'APPROVED').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     setGlobalSettings(db.getGlobalSettings());
@@ -400,8 +402,7 @@ const Invoices = () => {
           </table>
         </div>
       </div>
-
-      {/* Geçmiş Faturalar */}
+{/* Geçmiş Faturalar */}
       {showHistory && (
           <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden opacity-75">
             <div className="p-4 bg-slate-900/50 border-b border-slate-700"><h3 className="text-lg font-semibold text-slate-400">Geçmiş Faturalar</h3></div>

@@ -1,5 +1,4 @@
-
-import { Firm, Transaction, TransactionType, PreparationItem, InvoiceType, GlobalSettings, PricingModel, LogEntry, PricingTier } from '../types';
+import { Firm, Transaction, TransactionType, PreparationItem, InvoiceType, GlobalSettings, PricingModel, LogEntry, PricingTier, ServiceType } from '../types';
 import * as XLSX from 'xlsx';
 
 // Basit ID oluşturucu
@@ -160,7 +159,8 @@ export const db = {
 
   // Firms
   getFirms: (): Firm[] => {
-    return getStorage<Firm[]>(STORAGE_KEYS.FIRMS, []);
+    const firms = getStorage<Firm[]>(STORAGE_KEYS.FIRMS, []);
+    return firms.sort((a, b) => a.name.localeCompare(b.name));
   },
   
   addFirm: (firm: Omit<Firm, 'id'>) => {
@@ -343,6 +343,11 @@ export const db = {
       if(modelInput.includes('TOLERAN')) pModel = PricingModel.TOLERANCE;
       if(modelInput.includes('KADEM')) pModel = PricingModel.TIERED;
       
+      let sType = ServiceType.BOTH;
+      const sTypeInput = (row['Hizmet Türü'] || '').toString().toUpperCase();
+      if(sTypeInput.includes('SADECE UZMAN')) sType = ServiceType.EXPERT_ONLY;
+      if(sTypeInput.includes('SADECE HEKIM') || sTypeInput.includes('SADECE DOKTOR')) sType = ServiceType.DOCTOR_ONLY;
+
       const firmTiers: PricingTier[] = [];
       if (pModel === PricingModel.TIERED) {
           const tiers = tiersData.filter((t: any) => t['Firma Adı'] === name);
@@ -369,7 +374,8 @@ export const db = {
         pricingModel: pModel,
         tolerancePercentage: Number(row['Tolerans Yüzdesi']) || 0,
         tiers: firmTiers,
-        yearlyFee: (Number(row['Yıllık Ücret']) || 0) * vatMultiplier
+        yearlyFee: (Number(row['Yıllık Ücret']) || 0) * vatMultiplier,
+        serviceType: sType
       };
 
       currentFirms.push(newFirm);

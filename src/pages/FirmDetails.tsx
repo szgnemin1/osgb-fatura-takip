@@ -26,16 +26,28 @@ const FirmDetails = () => {
     open: false, invoice: null, date: new Date().toISOString().split('T')[0]
   });
 
-  useEffect(() => { setFirms(db.getFirms()); }, []);
+  useEffect(() => { 
+      // Firmalar zaten alfabetik geliyor db servisinden
+      setFirms(db.getFirms()); 
+  }, []);
+
   useEffect(() => {
     if (selectedFirmId) {
       const all = db.getTransactions();
+      
+      // PARENT/CHILD LOGIC
+      // Seçilen firma bir "Ana Firma" ise, onun çocuklarını da (parentFirmId === selectedFirmId) bul.
+      // Seçilen firma bir "Şube" ise, sadece kendisini göster.
+      const childIds = firms.filter(f => f.parentFirmId === selectedFirmId).map(f => f.id);
+      const targetIds = [selectedFirmId, ...childIds];
+
       const filtered = all
-        .filter(t => t.firmId === selectedFirmId && (t.status === 'APPROVED' || t.status === undefined))
+        .filter(t => targetIds.includes(t.firmId) && (t.status === 'APPROVED' || t.status === undefined))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        
       setTransactions(filtered);
     } else { setTransactions([]); }
-  }, [selectedFirmId, isPaymentModalOpen, isDebtModalOpen, invoicePayModal.open]); 
+  }, [selectedFirmId, isPaymentModalOpen, isDebtModalOpen, invoicePayModal.open, firms]); 
 
   const filteredFirms = firms.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -43,20 +55,22 @@ const FirmDetails = () => {
       window.focus();
       if(window.confirm(`Bu ${type} kaydını silmek istediğinize emin misiniz? Bakiye değişecektir.`)) {
           db.deleteTransaction(id);
-          // Refresh list
-          const all = db.getTransactions();
-          setTransactions(all.filter(t => t.firmId === selectedFirmId && t.status === 'APPROVED').sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+          // Force refresh logic is tied to state change in useEffect, but we need to trigger it.
+          // Quick hack: re-fetch or clear selected to toggle
+          const current = selectedFirmId;
+          setSelectedFirmId('');
+          setTimeout(() => setSelectedFirmId(current), 50);
           window.focus();
       }
   };
 
-  // ... (Export functions same as before) ...
   const exportSingleFirm = () => {
     const firm = firms.find(f => f.id === selectedFirmId);
     if (!firm) return;
     const data = transactions.map(t => ({
       'Ay/Yıl': `${new Date(0, t.month - 1).toLocaleString('tr-TR', { month: 'long' })} ${t.year}`,
       'Tarih': new Date(t.date).toLocaleDateString('tr-TR'),
+      'Firma': firms.find(f => f.id === t.firmId)?.name, // Hangi şube olduğunu görmek için
       'Açıklama': t.description,
       'Borç': t.debt,
       'Alacak': t.credit
@@ -81,7 +95,7 @@ const FirmDetails = () => {
   const formatCurrency = (val: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
   const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('tr-TR');
 
-  // Add Payment/Debt handlers (same logic, just ensure window.focus)
+  // Add Payment/Debt handlers
   const handleAddPayment = (e: React.FormEvent) => {
       e.preventDefault();
       window.focus();
@@ -127,7 +141,7 @@ const FirmDetails = () => {
       <header className="flex justify-between items-start">
         <div>
           <h2 className="text-3xl font-bold text-slate-100 flex items-center gap-3"><FileText className="w-8 h-8 text-purple-500" /> Cari Detay (Ekstre)</h2>
-          <p className="text-slate-400 mt-2">Firma bazlı kesinleşmiş hareketler ve bakiye durumu.</p>
+          <p className="text-slate-400 mt-2">Firma bazlı kesinleşmiş hareketler ve bakiye durumu. Ana firma seçildiğinde şubeler dahil edilir.</p>
         </div>
         <button onClick={exportBulkBalances} className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm transition-colors border border-slate-600"><Table className="w-4 h-4" /> Tüm Bakiye Raporu (Excel)</button>
       </header>
@@ -143,7 +157,10 @@ const FirmDetails = () => {
           </div>
           <div className="overflow-y-auto flex-1 p-2 space-y-1">
             {filteredFirms.map(firm => (
-              <button key={firm.id} onClick={() => setSelectedFirmId(firm.id)} className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-colors ${selectedFirmId === firm.id ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>{firm.name}</button>
+              <button key={firm.id} onClick={() => setSelectedFirmId(firm.id)} className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-colors flex justify-between items-center ${selectedFirmId === firm.id ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700'}`}>
+                  <span>{firm.name}</span>
+                  {firm.parentFirmId && <span className="text-[10px] bg-black/20 px-1 rounded ml-1">Şube</span>}
+              </button>
             ))}
             {filteredFirms.length === 0 && <div className="p-4 text-center text-slate-500 text-sm">Firma bulunamadı.</div>}
           </div>
@@ -156,7 +173,10 @@ const FirmDetails = () => {
               {/* Toolbar */}
               <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50 backdrop-blur">
                 <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-bold text-white">{firms.find(f => f.id === selectedFirmId)?.name} Hareketleri</h3>
+                  <h3 className="text-lg font-bold text-white flex flex-col">
+                      <span>{firms.find(f => f.id === selectedFirmId)?.name} Hareketleri</span>
+                      <span className="text-xs text-slate-400 font-normal">Bu firma ve bağlı şubeleri dahildir</span>
+                  </h3>
                   <button onClick={exportSingleFirm} className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-md transition-colors"><Download className="w-5 h-5" /></button>
                 </div>
                 <div className="flex gap-2">
@@ -173,19 +193,28 @@ const FirmDetails = () => {
                       <th className="p-4 text-slate-400 font-medium text-xs uppercase tracking-wider">Ay/Yıl</th>
                       <th className="p-4 text-slate-400 font-medium text-xs uppercase tracking-wider">Tarih</th>
                       <th className="p-4 text-slate-400 font-medium text-xs uppercase tracking-wider">Açıklama</th>
+                      <th className="p-4 text-slate-400 font-medium text-xs uppercase tracking-wider">Şube/Firma</th>
                       <th className="p-4 text-slate-400 font-medium text-xs uppercase tracking-wider text-right">Borç</th>
                       <th className="p-4 text-slate-400 font-medium text-xs uppercase tracking-wider text-right">Alacak</th>
                       <th className="p-4 text-slate-400 font-medium text-xs uppercase tracking-wider text-center">İşlem</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700">
-                    {transactions.map(t => (
+                    {transactions.map(t => {
+                        const tFirm = firms.find(f => f.id === t.firmId);
+                        const isChild = t.firmId !== selectedFirmId;
+                        return (
                       <tr key={t.id} className="hover:bg-slate-700/30 group">
                         <td className="p-4 text-slate-400 text-sm">{new Date(0, t.month - 1).toLocaleString('tr-TR', { month: 'long' })} {t.year}</td>
                         <td className="p-4 text-slate-300 text-sm">{formatDate(t.date)}</td>
                         <td className="p-4 text-slate-300 text-sm flex items-center gap-2">
                            {t.type === TransactionType.INVOICE ? <ArrowUpRight className="w-4 h-4 text-rose-500"/> : <ArrowDownLeft className="w-4 h-4 text-emerald-500"/>}
                            {t.description}
+                        </td>
+                        <td className="p-4 text-sm">
+                            <span className={`px-2 py-0.5 rounded text-xs ${isChild ? 'bg-purple-500/20 text-purple-300' : 'text-slate-400'}`}>
+                                {tFirm?.name}
+                            </span>
                         </td>
                         <td className="p-4 text-right text-rose-400 font-medium text-sm">{t.debt > 0 ? formatCurrency(t.debt) : '-'}</td>
                         <td className="p-4 text-right text-emerald-400 font-medium text-sm">{t.credit > 0 ? formatCurrency(t.credit) : '-'}</td>
@@ -196,8 +225,8 @@ const FirmDetails = () => {
                             <button onClick={() => handleDeleteTransaction(t.id, t.type)} className="p-1 text-slate-600 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Sil"><Trash2 className="w-4 h-4" /></button>
                         </td>
                       </tr>
-                    ))}
-                    {transactions.length === 0 && <tr><td colSpan={6} className="p-12 text-center text-slate-500">Kayıt bulunamadı.</td></tr>}
+                    )})}
+                    {transactions.length === 0 && <tr><td colSpan={7} className="p-12 text-center text-slate-500">Kayıt bulunamadı.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -213,7 +242,7 @@ const FirmDetails = () => {
         </div>
       </div>
       
-      {/* Payment Modal */}
+      {/* Modals are kept the same... */}
       {isPaymentModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-2xl w-96 animate-in zoom-in-95 duration-200">
@@ -230,7 +259,6 @@ const FirmDetails = () => {
         </div>
       )}
 
-      {/* Debt Modal & Invoice Pay Modal would be here (keeping concise) - Assumed rendered similarly */}
        {isDebtModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-2xl w-96 animate-in zoom-in-95 duration-200">

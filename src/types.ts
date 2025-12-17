@@ -2,11 +2,15 @@
 export interface Firm {
   id: string;
   name: string;
+  parentFirmId?: string; // Ana Firma ID'si (Şube mantığı için)
   basePersonLimit: number; // Taban Kişi Limiti (Standart ve Tolerans için merkez)
   baseFee: number; // Taban Ücret
   extraPersonFee: number; // Ekstra Kişi Ücreti (Limit aşımı veya düşümü için)
   defaultInvoiceType: InvoiceType;
   
+  // Hizmet Türü (Yeni Özellik)
+  serviceType: ServiceType; // 'BOTH' | 'EXPERT_ONLY' | 'DOCTOR_ONLY'
+
   // Yıllık Ücret
   yearlyFee?: number; // Yılda bir kez alınacak ücret
   
@@ -23,9 +27,15 @@ export interface Firm {
   hasSecondaryModel?: boolean;
   secondaryPricingModel?: PricingModel;
   secondaryBaseFee?: number;
-  secondaryExtraPersonFee?: number;
   secondaryBasePersonLimit?: number;
+  secondaryExtraPersonFee?: number;
   secondaryTiers?: PricingTier[];
+}
+
+export enum ServiceType {
+  BOTH = 'TÜMÜ',
+  EXPERT_ONLY = 'SADECE_UZMAN',
+  DOCTOR_ONLY = 'SADECE_HEKIM'
 }
 
 export enum PricingModel {
@@ -90,6 +100,7 @@ export interface PreparationItem {
   currentEmployeeCount: number;
   extraItemAmount: number;
   addYearlyFee?: boolean; // Bu ay yıllık ücret eklensin mi?
+  // Checkboxlar kaldırıldı, Firm.serviceType kullanılacak
 }
 
 export interface LogEntry {
