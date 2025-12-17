@@ -1,4 +1,3 @@
-
 {
   "name": "osgb-fatura-takip",
   "version": "1.4.5",
@@ -10,6 +9,10 @@
     "name": "Emin Sezgin",
     "email": "contact@szgnemin.com"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/szgnemin1/osgb-fatura-takip.git"
+  },
   "dependencies": {
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
@@ -18,6 +21,7 @@
     "@types/node": "^16.18.101",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
+    "electron-updater": "^6.1.1",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.2",
     "lucide-react": "^0.263.1",
@@ -48,6 +52,13 @@
   "build": {
     "appId": "com.osgb.profinans",
     "productName": "OSGB Fatura Takip",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "szgnemin1",
+        "repo": "osgb-fatura-takip"
+      }
+    ],
     "files": [
       "build/**/*",
       "public/electron.js"

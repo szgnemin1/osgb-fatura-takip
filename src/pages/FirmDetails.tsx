@@ -3,13 +3,22 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Firm, Transaction, TransactionType } from '../types';
 import { exporter } from '../services/exporter';
-import { FileText, Search, PlusCircle, ArrowDownLeft, ArrowUpRight, Building2, Download, Table, FilePlus, Banknote, Calendar, Trash2 } from 'lucide-react';
+import { FileText, Search, PlusCircle, ArrowDownLeft, ArrowUpRight, Building2, Download, Table, FilePlus, Calendar, Trash2, Filter, RefreshCw } from 'lucide-react';
 
 const FirmDetails = () => {
   const [firms, setFirms] = useState<Firm[]>([]);
   const [selectedFirmId, setSelectedFirmId] = useState<string>('');
+  
+  // İşlem Verileri
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [openingBalance, setOpeningBalance] = useState<number>(0);
+  
+  // Filtreler
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateRange, setDateRange] = useState({
+      start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Yılın ilk günü
+      end: new Date().toISOString().split('T')[0] // Bugün
+  });
   
   // Modals
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -31,6 +40,7 @@ const FirmDetails = () => {
       setFirms(db.getFirms()); 
   }, []);
 
+  // VERİ YÜKLEME VE FİLTRELEME MANTIĞI
   useEffect(() => {
     if (selectedFirmId) {
       const all = db.getTransactions();
@@ -41,13 +51,37 @@ const FirmDetails = () => {
       const childIds = firms.filter(f => f.parentFirmId === selectedFirmId).map(f => f.id);
       const targetIds = [selectedFirmId, ...childIds];
 
-      const filtered = all
-        .filter(t => targetIds.includes(t.firmId) && (t.status === 'APPROVED' || t.status === undefined))
+      // 1. İlgili firmanın (ve şubelerinin) tüm onaylı işlemlerini çek
+      const firmAllTrans = all.filter(t => 
+          targetIds.includes(t.firmId) && (t.status === 'APPROVED' || t.status === undefined)
+      );
+
+      // 2. Tarih filtreleme mantığı
+      const startDateTimestamp = new Date(dateRange.start).setHours(0,0,0,0);
+      const endDateTimestamp = new Date(dateRange.end).setHours(23,59,59,999);
+
+      // A) Devreden Bakiye (Başlangıç tarihinden öncekiler)
+      const previousTrans = firmAllTrans.filter(t => new Date(t.date).getTime() < startDateTimestamp);
+      const prevDebt = previousTrans.reduce((sum, t) => sum + t.debt, 0);
+      const prevCredit = previousTrans.reduce((sum, t) => sum + t.credit, 0);
+      const calculatedOpening = prevDebt - prevCredit;
+      
+      setOpeningBalance(calculatedOpening);
+
+      // B) Listelenecek İşlemler (Tarih aralığındakiler)
+      const rangeTrans = firmAllTrans
+        .filter(t => {
+            const d = new Date(t.date).getTime();
+            return d >= startDateTimestamp && d <= endDateTimestamp;
+        })
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
         
-      setTransactions(filtered);
-    } else { setTransactions([]); }
-  }, [selectedFirmId, isPaymentModalOpen, isDebtModalOpen, invoicePayModal.open, firms]); 
+      setTransactions(rangeTrans);
+    } else { 
+        setTransactions([]); 
+        setOpeningBalance(0);
+    }
+  }, [selectedFirmId, isPaymentModalOpen, isDebtModalOpen, invoicePayModal.open, firms, dateRange]); 
 
   const filteredFirms = firms.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -55,8 +89,7 @@ const FirmDetails = () => {
       window.focus();
       if(window.confirm(`Bu ${type} kaydını silmek istediğinize emin misiniz? Bakiye değişecektir.`)) {
           db.deleteTransaction(id);
-          // Force refresh logic is tied to state change in useEffect, but we need to trigger it.
-          // Quick hack: re-fetch or clear selected to toggle
+          // Tetiklemek için state'i ufakça dürtüyoruz (veya refresh logic eklenebilir ama bu yeterli)
           const current = selectedFirmId;
           setSelectedFirmId('');
           setTimeout(() => setSelectedFirmId(current), 50);
@@ -67,16 +100,37 @@ const FirmDetails = () => {
   const exportSingleFirm = () => {
     const firm = firms.find(f => f.id === selectedFirmId);
     if (!firm) return;
-    const data = transactions.map(t => ({
-      'Ay/Yıl': `${new Date(0, t.month - 1).toLocaleString('tr-TR', { month: 'long' })} ${t.year}`,
-      'Tarih': new Date(t.date).toLocaleDateString('tr-TR'),
-      'Firma': firms.find(f => f.id === t.firmId)?.name, // Hangi şube olduğunu görmek için
-      'Açıklama': t.description,
-      'Borç': t.debt,
-      'Alacak': t.credit
-    }));
-    exporter.exportToExcel(`${firm.name}_Ekstre`, data);
+    
+    // Excel Verisi Hazırlama
+    const exportData = [];
+
+    // 1. Devreden Satırı
+    if (openingBalance !== 0) {
+        exportData.push({
+            'Ay/Yıl': '-',
+            'Tarih': `${new Date(dateRange.start).toLocaleDateString('tr-TR')} Öncesi`,
+            'Firma': '-',
+            'Açıklama': 'DEVREDEN BAKİYE',
+            'Borç': openingBalance > 0 ? openingBalance : 0,
+            'Alacak': openingBalance < 0 ? Math.abs(openingBalance) : 0
+        });
+    }
+
+    // 2. Hareketler
+    transactions.forEach(t => {
+        exportData.push({
+            'Ay/Yıl': `${new Date(0, t.month - 1).toLocaleString('tr-TR', { month: 'long' })} ${t.year}`,
+            'Tarih': new Date(t.date).toLocaleDateString('tr-TR'),
+            'Firma': firms.find(f => f.id === t.firmId)?.name,
+            'Açıklama': t.description,
+            'Borç': t.debt,
+            'Alacak': t.credit
+        });
+    });
+
+    exporter.exportToExcel(`${firm.name}_Ekstre_${dateRange.start}_${dateRange.end}`, exportData);
   };
+
   const exportBulkBalances = () => {
     const allTrans = db.getTransactions();
     const data = firms.map(firm => {
@@ -89,9 +143,12 @@ const FirmDetails = () => {
     exporter.exportToExcel('Tum_Firmalar_Bakiye_Raporu', data);
   };
 
-  const totalBilled = transactions.reduce((sum, t) => sum + t.debt, 0);
-  const totalPaid = transactions.reduce((sum, t) => sum + t.credit, 0);
-  const balance = totalBilled - totalPaid;
+  // Hesaplamalar (Tablo altı için)
+  const rangeBilled = transactions.reduce((sum, t) => sum + t.debt, 0);
+  const rangePaid = transactions.reduce((sum, t) => sum + t.credit, 0);
+  // Final Bakiye = Devreden + (Bu aralıktaki Borç - Bu aralıktaki Alacak)
+  const finalBalance = openingBalance + (rangeBilled - rangePaid);
+
   const formatCurrency = (val: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
   const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('tr-TR');
 
@@ -171,18 +228,51 @@ const FirmDetails = () => {
           {selectedFirmId ? (
             <>
               {/* Toolbar */}
-              <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50 backdrop-blur">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-lg font-bold text-white flex flex-col">
-                      <span>{firms.find(f => f.id === selectedFirmId)?.name} Hareketleri</span>
-                      <span className="text-xs text-slate-400 font-normal">Bu firma ve bağlı şubeleri dahildir</span>
-                  </h3>
-                  <button onClick={exportSingleFirm} className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-md transition-colors"><Download className="w-5 h-5" /></button>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => { setIsDebtModalOpen(true); setDebtDate(new Date().toISOString().split('T')[0]); }} className="bg-rose-700 hover:bg-rose-800 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors"><FilePlus className="w-4 h-4" /> Borç Ekle</button>
-                    <button onClick={() => { setIsPaymentModalOpen(true); setPaymentDate(new Date().toISOString().split('T')[0]); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors"><PlusCircle className="w-4 h-4" /> Tahsilat Ekle</button>
-                </div>
+              <div className="p-4 border-b border-slate-700 flex flex-col gap-4 bg-slate-800/50 backdrop-blur">
+                  
+                  {/* Üst Satır: Başlık ve Butonlar */}
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-bold text-white flex flex-col">
+                            <span>{firms.find(f => f.id === selectedFirmId)?.name} Hareketleri</span>
+                            <span className="text-xs text-slate-400 font-normal">Bu firma ve bağlı şubeleri dahildir</span>
+                        </h3>
+                        <button onClick={exportSingleFirm} className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-md transition-colors" title="Ekstreyi Excel İndir"><Download className="w-5 h-5" /></button>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => { setIsDebtModalOpen(true); setDebtDate(new Date().toISOString().split('T')[0]); }} className="bg-rose-700 hover:bg-rose-800 text-white px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors"><FilePlus className="w-4 h-4" /> Borç Ekle</button>
+                        <button onClick={() => { setIsPaymentModalOpen(true); setPaymentDate(new Date().toISOString().split('T')[0]); }} className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors"><PlusCircle className="w-4 h-4" /> Tahsilat Ekle</button>
+                    </div>
+                  </div>
+
+                  {/* Alt Satır: Tarih Filtreleri */}
+                  <div className="flex items-center gap-4 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
+                      <div className="flex items-center gap-2">
+                          <Filter className="w-4 h-4 text-slate-500" />
+                          <span className="text-sm text-slate-400 font-medium">Tarih Aralığı:</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <input 
+                              type="date" 
+                              value={dateRange.start} 
+                              onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                              className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white outline-none focus:border-blue-500"
+                          />
+                          <span className="text-slate-500">-</span>
+                          <input 
+                              type="date" 
+                              value={dateRange.end} 
+                              onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                              className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white outline-none focus:border-blue-500"
+                          />
+                      </div>
+                      <button 
+                        onClick={() => setDateRange({ start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] })}
+                        className="ml-auto text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                      >
+                          <RefreshCw className="w-3 h-3" /> Bu Yıl
+                      </button>
+                  </div>
               </div>
 
               {/* Table */}
@@ -200,6 +290,27 @@ const FirmDetails = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700">
+                    
+                    {/* DEVREDEN BAKİYE SATIRI */}
+                    {openingBalance !== 0 && (
+                        <tr className="bg-slate-900/40 hover:bg-slate-900/60 transition-colors border-b border-blue-900/30">
+                            <td className="p-4 text-blue-400 font-bold text-sm">-</td>
+                            <td className="p-4 text-blue-400 font-bold text-sm">{formatDate(dateRange.start)} Öncesi</td>
+                            <td className="p-4 text-blue-400 font-bold text-sm flex items-center gap-2">
+                                <ArrowDownLeft className="w-4 h-4" />
+                                DEVREDEN BAKİYE
+                            </td>
+                            <td className="p-4 text-blue-400 text-sm">-</td>
+                            <td className="p-4 text-right font-bold text-blue-400 text-sm">
+                                {openingBalance > 0 ? formatCurrency(openingBalance) : '-'}
+                            </td>
+                            <td className="p-4 text-right font-bold text-blue-400 text-sm">
+                                {openingBalance < 0 ? formatCurrency(Math.abs(openingBalance)) : '-'}
+                            </td>
+                            <td className="p-4 text-center"></td>
+                        </tr>
+                    )}
+
                     {transactions.map(t => {
                         const tFirm = firms.find(f => f.id === t.firmId);
                         const isChild = t.firmId !== selectedFirmId;
@@ -226,14 +337,32 @@ const FirmDetails = () => {
                         </td>
                       </tr>
                     )})}
-                    {transactions.length === 0 && <tr><td colSpan={7} className="p-12 text-center text-slate-500">Kayıt bulunamadı.</td></tr>}
+                    {transactions.length === 0 && openingBalance === 0 && <tr><td colSpan={7} className="p-12 text-center text-slate-500">Seçilen tarih aralığında kayıt bulunamadı.</td></tr>}
                   </tbody>
                 </table>
               </div>
-              <div className="p-6 bg-slate-900 border-t border-slate-700 grid grid-cols-3 gap-8">
-                <div><div className="text-xs text-slate-500 uppercase">Toplam Kesilen</div><div className="text-xl font-bold text-rose-500">{formatCurrency(totalBilled)}</div></div>
-                <div><div className="text-xs text-slate-500 uppercase">Toplam Tahsilat</div><div className="text-xl font-bold text-emerald-500">{formatCurrency(totalPaid)}</div></div>
-                <div><div className="text-xs text-slate-500 uppercase">Kalan Bakiye</div><div className={`text-2xl font-bold ${balance > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{formatCurrency(balance)}</div></div>
+
+              {/* FOOTER SUMMARY */}
+              <div className="p-6 bg-slate-900 border-t border-slate-700 grid grid-cols-3 gap-8 relative">
+                  {/* Bilgilendirme Notu */}
+                  <div className="absolute top-2 left-6 text-[10px] text-slate-600">
+                      * Aşağıdaki toplamlar seçili tarih aralığı ({formatDate(dateRange.start)} - {formatDate(dateRange.end)}) ve devreden bakiyeyi içerir.
+                  </div>
+
+                <div className="mt-2">
+                    <div className="text-xs text-slate-500 uppercase">Seçili Aralıkta Kesilen</div>
+                    <div className="text-xl font-bold text-rose-500">{formatCurrency(rangeBilled)}</div>
+                </div>
+                <div className="mt-2">
+                    <div className="text-xs text-slate-500 uppercase">Seçili Aralıkta Tahsilat</div>
+                    <div className="text-xl font-bold text-emerald-500">{formatCurrency(rangePaid)}</div>
+                </div>
+                <div className="mt-2">
+                    <div className="text-xs text-slate-500 uppercase">Genel Bakiye (Devreden Dahil)</div>
+                    <div className={`text-2xl font-bold ${finalBalance > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        {formatCurrency(finalBalance)}
+                    </div>
+                </div>
               </div>
             </>
           ) : (
