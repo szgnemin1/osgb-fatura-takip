@@ -71,4 +71,5 @@ npm run electron:build
 *   [GitHub](https://github.com/szgnemin1)
 
 ---
+*Projede bazı sorunlar olabilir bunları düzeltmem için lütfen geri bildirim yapın eğer konu hakkında bilginiz varsa destek olun bu sayede sorunları daha hızlı düzeltebilirim*
 *Bu proje profesyonel OSGB finans yönetimi için geliştirilmiştir.*
