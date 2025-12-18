@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Building2, Calculator, Receipt, FileText, Settings, TrendingDown } from 'lucide-react';
+import { LayoutDashboard, Building2, Calculator, Receipt, FileText, Settings, TrendingDown, LifeBuoy } from 'lucide-react';
 
 const Sidebar = () => {
   const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -20,7 +20,7 @@ const Sidebar = () => {
         </h1>
       </div>
       
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-1">
         <NavLink to="/" className={navClass}>
           <LayoutDashboard className="w-5 h-5" />
           <span>Dashboard</span>
@@ -46,7 +46,11 @@ const Sidebar = () => {
           <span>Borç Takip</span>
         </NavLink>
         
-        <div className="pt-4 border-t border-slate-800 mt-4">
+        <div className="pt-4 border-t border-slate-800 mt-4 space-y-1">
+          <NavLink to="/support" className={navClass}>
+            <LifeBuoy className="w-5 h-5" />
+            <span>Destek & İletişim</span>
+          </NavLink>
           <NavLink to="/settings" className={navClass}>
             <Settings className="w-5 h-5" />
             <span>Ayarlar & Yedek</span>
@@ -55,7 +59,7 @@ const Sidebar = () => {
       </nav>
 
       <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
-        v1.4.6 • OSGB Fatura Takip
+        v1.4.7 • OSGB Fatura Takip
       </div>
     </div>
   );

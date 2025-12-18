@@ -9,6 +9,7 @@ import Invoices from './pages/Invoices';
 import FirmDetails from './pages/FirmDetails';
 import Settings from './pages/Settings';
 import DebtTracking from './pages/DebtTracking';
+import Support from './pages/Support'; // Yeni sayfa eklendi
 import { db } from './services/db';
 import { DownloadCloud, RefreshCw, X } from 'lucide-react';
 
@@ -62,6 +63,7 @@ const App = () => {
               <Route path="/invoices" element={<Invoices />} />
               <Route path="/details" element={<FirmDetails />} />
               <Route path="/debt-tracking" element={<DebtTracking />} />
+              <Route path="/support" element={<Support />} /> {/* Yeni rota */}
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

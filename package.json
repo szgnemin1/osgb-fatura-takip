@@ -1,13 +1,14 @@
+
 {
   "name": "osgb-fatura-takip",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "private": true,
   "homepage": "./",
   "main": "public/electron.js",
   "description": "Profesyonel OSGB Ön Muhasebe ve Fatura Takip Sistemi",
   "author": {
     "name": "Emin Sezgin",
-    "email": "contact@szgnemin.com"
+    "email": "m.e.sezgin04@gmail.com"
   },
   "repository": {
     "type": "git",
