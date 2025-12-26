@@ -1,65 +1,120 @@
-# 🏢 OSGB Fatura & Finans Yönetim Sistemi (ProFinans)
+<div align="center">
+  
+  <!-- LOGO VEYA BANNER ALANI -->
+  <!-- Buraya ileride projenin logosunu veya banner görselini ekleyebilirsin: -->
+  <!-- <img src="docs/banner.png" alt="OSGB ProFinans Banner" width="100%" /> -->
+  
+  <img src="public/logo.svg" alt="Logo" width="100" height="100" />
 
-**Versiyon:** 1.4.9 (Güncel)  
-**Tarih:** 2024
+  # 🏢 OSGB ProFinans
+  
+  **Yeni Nesil Ön Muhasebe, Hakediş ve Finans Yönetim Otomasyonu**
+  
+  <p>
+    OSGB'ler ve çalışan sayısına dayalı hizmet veren firmalar için geliştirilmiş;<br>
+    React ve Electron tabanlı, çevrimdışı çalışabilen masaüstü uygulaması.
+  </p>
 
-Bu yazılım, OSGB (Ortak Sağlık Güvenlik Birimi) ve hizmet sektöründeki firmaların finansal süreçlerini **en az eforla, hatasız ve hızlı** bir şekilde yönetmeleri için tasarlanmıştır. Karmaşık muhasebe programlarının aksine, sadece ihtiyacınız olan özelliklere odaklanır ve kullanımı son derece basittir.
+  <!-- ROZETLER -->
+  <p>
+    <img src="https://img.shields.io/badge/versiyon-1.5.0-blue.svg?style=flat-square" alt="Versiyon">
+    <img src="https://img.shields.io/badge/lisans-MIT-green.svg?style=flat-square" alt="Lisans">
+    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Mac-lightgrey.svg?style=flat-square" alt="Platform">
+    <br>
+    <img src="https://img.shields.io/badge/React-18-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black" alt="React">
+    <img src="https://img.shields.io/badge/TypeScript-007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+    <img src="https://img.shields.io/badge/Electron-47848F.svg?style=for-the-badge&logo=electron&logoColor=white" alt="Electron">
+    <img src="https://img.shields.io/badge/Tailwind-38B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind">
+  </p>
+</div>
 
 ---
 
-## 🚀 Öne Çıkan Özellikler
+## 📸 Ekran Görüntüleri ve Önizleme
 
-### 1. ⚡ Akıllı Hakediş Hesaplama
-Her ay tek tek hesap yapmaya son! Firmanızın sözleşme şartlarını bir kez girin, sistem her ay çalışan sayısına göre faturayı otomatik hesaplasın.
-*   **Standart Model:** (Örn: 10 kişiye kadar 1000 TL, sonrası kişi başı 50 TL)
-*   **Toleranslı Model:** (Örn: %10 artışa kadar fiyat sabit)
-*   **Kademeli Model:** (Örn: 0-50 kişi arası X TL, 51-100 arası Y TL)
+<!-- 
+    NOT: Burası resim ve GIF'ler için ayrılmış alandır. 
+    Projenin ekran görüntülerini aldığında 'docs' klasörüne atıp aşağıdaki linkleri güncelleyebilirsin.
+-->
 
-### 2. 🗂️ Havuz (Şube) Yönetimi
-Ana firmaya bağlı şubeleriniz mi var? 
+| **Genel Bakış (Dashboard)** | **Fatura Hazırlık & Havuz** |
+|:---------------------------:|:---------------------------:|
+| <img src="https://placehold.co/600x400/1e293b/FFF?text=Dashboard+Gorseli+Buraya" alt="Dashboard" width="100%"> | <img src="https://placehold.co/600x400/1e293b/FFF?text=Fatura+Hesaplama+Gorseli" alt="Fatura Modülü" width="100%"> |
+| *Finansal durum, anlık ciro ve grafikler* | *Otomatik hakediş hesaplama ve havuz yönetimi* |
+
+| **Borç Yaşlandırma Analizi** | **Ayarlar & Veri Yönetimi** |
+|:----------------------------:|:---------------------------:|
+| <img src="https://placehold.co/600x400/1e293b/FFF?text=Borc+Yaslandirma+Gorseli" alt="Borç Takip" width="100%"> | <img src="https://placehold.co/600x400/1e293b/FFF?text=Ayarlar+ve+Yedekleme" alt="Ayarlar" width="100%"> |
+| *Riskli bakiyelerin zaman bazlı analizi* | *Excel import/export ve Bulut yedekleme* |
+
+---
+
+## 🚀 Temel Özellikler
+
+### ⚡ Akıllı Hakediş Motoru
+Excel tablolarıyla uğraşmaya son. Sözleşme kurallarını bir kez girin, sistem her ay çalışan sayısına göre faturayı otomatik hesaplasın.
+*   **Standart Model:** Limit aşımına göre ek ücret.
+*   **Toleranslı Model:** Belirli % sapmalara kadar sabit fiyat.
+*   **Kademeli (Tiered) Model:** (0-50 kişi arası X TL, 51-100 arası Y TL).
+
+### 🔗 Gelişmiş Havuz (Şube) Yönetimi
+Dağınık şubeleri olan müşterilerinizi tek çatı altında toplayın.
 *   Şubelerin çalışan sayılarını ayrı ayrı girin.
-*   Sistem, tüm şubelerin hesaplamalarını otomatik olarak **Ana Firma** faturasında birleştirir.
-*   Tek tıkla konsolide fatura oluşturun.
+*   Sistem, tüm şubeleri **Ana Firma** altında otomatik birleştirir.
+*   Tek tıkla konsolide fatura oluşturur.
 
-### 3. 💸 Borç Yaşlandırma Analizi
-*"Hangi firma bana ne kadar süredir ödeme yapmıyor?"* sorusunun cevabı artık tek ekranda.
-*   Borçları 1 aydan 12 aya kadar sınıflandırır.
-*   Riskli firmaları (örn: 6 aydır ödemeyenler) kırmızı renk ile uyarır.
+### 📉 Borç Yaşlandırma (Debt Aging)
+Tahsilat riskini minimize edin.
+*   Hangi firma ne kadar süredir ödeme yapmıyor? (1-12 Ay Analizi)
+*   Riskli firmaları renk kodlarıyla (Kırmızı/Turuncu) görselleştirin.
 
-### 4. 📄 Kolay Fatura Kesimi
-*   Fatura tutarlarını **"Yalnız... Türk Lirasıdır"** şeklinde yazı ile tek tıkla kopyalayın.
-*   Uzman, Hekim ve Sağlık Hizmeti paylarını net/brüt olarak ayrı ayrı görün.
-*   E-Fatura ve E-Arşiv mükelleflerini otomatik ayırt edin.
-
-### 5. ☁️ & 💾 Güvenli Veri Saklama
-*   **Yerel Yedekleme:** Verileriniz bilgisayarınızda güvenle saklanır. İnternet kesilse bile çalışmaya devam edersiniz.
-*   **Bulut Senkronizasyon (Opsiyonel):** Evdeki ve ofisteki bilgisayarınız arasında verileri taşımak için Google altyapısını kullanabilirsiniz.
+### ☁️ Hibrit Veri Mimarisi (Offline-First)
+*   **Tamamen Yerel:** İnternet olmasa bile çalışır. Veriler `localStorage` ve dosya sisteminde şifreli tutulur.
+*   **Bulut Senkronizasyon:** İsterseniz **Google Firebase** entegrasyonu ile verilerinizi ofis ve ev arasında eşitleyebilirsiniz.
 
 ---
 
-## 📈 v1.4.9 Güncelleme Notları (YENİ)
+## 🛠️ Kurulum ve Geliştirme
 
-Müşteri geri bildirimleri doğrultusunda yapılan son iyileştirmeler:
+Projeyi bilgisayarınıza klonlayıp geliştirmeye başlamak için:
 
-*   ✅ **Ana Sayfa İyileştirmesi:** "Bu Ay Fatura" alanı artık sadece **Onaylanmış (Resmileşmiş)** faturaları gösteriyor. Taslak aşamasındaki faturalar ciroya dahil edilmeyerek yanılgı önlendi.
-*   ✅ **Donma Sorunu Çözüldü:** Binlerce kayıt olsa bile program artık takılmadan, anlık tepki veriyor.
-*   ✅ **Gelişmiş Destek:** Uygulama içinden tek tıkla teknik destek ekibine (Geliştiriciye) sistem bilgilerinizle birlikte mail atabilirsiniz.
-*   ✅ **KDV Ayarları:** Fiyatları "KDV Dahil" veya "KDV Hariç" olarak girebilme esnekliği getirildi.
+```bash
+# 1. Repoyu klonlayın
+git clone https://github.com/kullaniciadi/osgb-profinans.git
+
+# 2. Proje dizinine girin
+cd osgb-profinans
+
+# 3. Bağımlılıkları yükleyin
+npm install
+
+# 4. Geliştirme modunda başlatın (Web + Electron)
+npm run electron:dev
+```
+
+### 📦 Exe Olarak Derleme (Build)
+
+Windows için kurulabilir `.exe` dosyası oluşturmak için:
+
+```bash
+npm run electron:build
+```
+*Çıktı dosyası `dist/` klasöründe oluşacaktır.*
 
 ---
 
-## ❓ Nasıl Kullanılır?
+## 🤝 Katkıda Bulunma
 
-1.  **Firma Kayıt:** Sol menüden "Firma Kayıt"a gidin ve müşterilerinizi, kişi başı ücretlerini tanımlayın.
-2.  **Fatura Hazırlık:** Her ayın sonunda bu ekrana gelin, firmaların güncel çalışan sayılarını girin ve **"Tümünü Faturalaştır"** butonuna basın.
-3.  **Onaylama:** "Kesilecek Faturalar" ekranına düşen taslakları kontrol edin. Onayladığınız anda işlem **Cari Hesaba** işlenir ve ciroya yansır.
-4.  **Takip:** "Ana Sayfa" ve "Borç Takip" ekranlarından kimin ne kadar borcu olduğunu izleyin.
+1.  Bu repoyu Forklayın.
+2.  Yeni bir özellik dalı (feature branch) oluşturun (`git checkout -b feature/YeniOzellik`).
+3.  Değişikliklerinizi commit edin (`git commit -m 'Yeni özellik eklendi'`).
+4.  Dalı Pushlayın (`git push origin feature/YeniOzellik`).
+5.  Bir Pull Request oluşturun.
 
 ---
 
-## 📞 İletişim ve Destek
+## 📞 İletişim & Destek
 
-Uygulama ile ilgili her türlü soru, görüş ve öneriniz için uygulamanın **"Destek & İletişim"** menüsünü kullanabilirsiniz.
+Uygulama içerisindeki **Destek** menüsünden sistem bilgilerinizi otomatik analiz ederek hata raporu gönderebilirsiniz.
 
-**Geliştirici:** Emin Sezgin  
-*Profesyonel Çözümler, Kolay Yönetim.*
+**Geliştirici:** Emin Sezgin

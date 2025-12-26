@@ -1,10 +1,10 @@
 {
   "name": "osgb-fatura-takip",
-  "version": "1.4.9",
+  "version": "1.5.0",
   "private": true,
   "homepage": "./",
   "main": "public/electron.js",
-  "description": "Profesyonel OSGB Ön Muhasebe ve Fatura Takip Sistemi",
+  "description": "OSGB ve Hizmet Sektörü İçin Akıllı Hakediş ve Finans Yönetim Sistemi",
   "author": {
     "name": "Emin Sezgin",
     "email": "m.e.sezgin04@gmail.com"
@@ -17,83 +17,4 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
-    "@types/jest": "^27.5.2",
-    "@types/node": "^16.18.101",
-    "@types/react": "^18.3.1",
-    "@types/react-dom": "^18.3.0",
-    "electron-updater": "^6.1.1",
-    "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.2",
-    "lucide-react": "^0.263.1",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.14.2",
-    "react-scripts": "5.0.1",
-    "recharts": "^2.7.2",
-    "typescript": "^4.9.5",
-    "web-vitals": "^2.1.4",
-    "xlsx": "^0.18.5"
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.0",
-    "cross-env": "^7.0.3",
-    "electron": "^25.3.0",
-    "electron-builder": "^24.6.3",
-    "wait-on": "^7.0.1"
-  },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
-    "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:build": "npm run build && electron-builder -w"
-  },
-  "build": {
-    "appId": "com.osgb.profinans",
-    "productName": "OSGB Fatura Takip",
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "szgnemin1",
-        "repo": "osgb-fatura-takip"
-      }
-    ],
-    "files": [
-      "build/**/*",
-      "public/electron.js"
-    ],
-    "directories": {
-      "buildResources": "assets"
-    },
-    "win": {
-      "target": "nsis",
-      "icon": "public/favicon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "OSGB Fatura Takip"
-    }
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
-  }
-}
+    "@types/
