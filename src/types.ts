@@ -8,8 +8,11 @@ export interface Firm {
   extraPersonFee: number; // Ekstra Kişi Ücreti (Limit aşımı veya düşümü için)
   defaultInvoiceType: InvoiceType;
   
-  // Hizmet Türü (Yeni Özellik)
+  // Hizmet Türü
   serviceType: ServiceType; // 'BOTH' | 'EXPERT_ONLY' | 'DOCTOR_ONLY'
+
+  // KDV Durumu (Yeni)
+  isKdvExcluded?: boolean; // Eğer true ise, girilen fiyatlar NET kabul edilir, üzerine KDV eklenir.
 
   // Yıllık Ücret
   yearlyFee?: number; // Yılda bir kez alınacak ücret
@@ -30,6 +33,9 @@ export interface Firm {
   secondaryBasePersonLimit?: number;
   secondaryExtraPersonFee?: number;
   secondaryTiers?: PricingTier[];
+
+  // HAVUZ AYARLARI (YENİ)
+  savedPoolConfig?: string[]; // Havuza dahil edilecek firma ID'lerinin listesi
 }
 
 export enum ServiceType {
@@ -87,11 +93,11 @@ export interface Transaction {
   // Hesaplama detaylarını saklamak için (Historical data)
   calculatedDetails?: {
     employeeCount: number;
-    extraItemAmount: number; // Sağlık Ücreti
+    extraItemAmount: number; // Sağlık Ücreti (BRÜT)
     yearlyFeeAmount?: number; // Eklenen Yıllık Ücret
-    serviceAmount?: number; // Hakedişe konu olan saf hizmet bedeli
-    expertShare: number;
-    doctorShare: number;
+    serviceAmount?: number; // Hakedişe konu olan saf hizmet bedeli (BRÜT)
+    expertShare: number; // BRÜT Uzman Payı
+    doctorShare: number; // BRÜT Doktor Payı
   };
 }
 
@@ -100,7 +106,6 @@ export interface PreparationItem {
   currentEmployeeCount: number;
   extraItemAmount: number;
   addYearlyFee?: boolean; // Bu ay yıllık ücret eklensin mi?
-  // Checkboxlar kaldırıldı, Firm.serviceType kullanılacak
 }
 
 export interface LogEntry {

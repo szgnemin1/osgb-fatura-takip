@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
-import { Save, Building2, CheckCircle2, Trash2, Edit, Plus, X, Layers, CheckSquare, Square, Search, Network, Stethoscope } from 'lucide-react';
+import { Save, Building2, CheckCircle2, Trash2, Edit, Plus, X, Network, Stethoscope, CheckSquare, Square, Search } from 'lucide-react';
 import { InvoiceType, Firm, PricingModel, PricingTier, ServiceType } from '../types';
 
 const FirmRegistration = () => {
@@ -18,7 +18,8 @@ const FirmRegistration = () => {
     pricingModel: PricingModel.STANDARD,
     tolerancePercentage: 10,
     tiers: [],
-    serviceType: ServiceType.BOTH, // Varsayılan: Tümü
+    serviceType: ServiceType.BOTH,
+    isKdvExcluded: false, // Varsayılan KDV Dahil
     // İkincil Model Varsayılanları
     hasSecondaryModel: false,
     secondaryPricingModel: PricingModel.STANDARD,
@@ -42,7 +43,6 @@ const FirmRegistration = () => {
   const [newSecTier, setNewSecTier] = useState<PricingTier>({ min: 0, max: 0, price: 0 });
 
   const loadFirms = () => {
-    // db.getFirms() zaten alfabetik sıralıyor
     setExistingFirms(db.getFirms());
     setSelectedFirms([]);
   };
@@ -307,6 +307,22 @@ const FirmRegistration = () => {
           <div className="space-y-6">
              <h3 className="text-lg font-semibold text-slate-200 border-b border-slate-700 pb-2">Fiyatlandırma Kurgusu</h3>
              
+             {/* KDV Hariç Seçeneği */}
+             <div className="flex items-center gap-2 bg-slate-900/50 p-3 rounded-lg border border-slate-700">
+                <input 
+                    type="checkbox" 
+                    id="isKdvExcluded" 
+                    name="isKdvExcluded" 
+                    checked={formData.isKdvExcluded || false} 
+                    onChange={handleChange} 
+                    className="w-5 h-5 rounded border-slate-600 text-blue-600 focus:ring-blue-500" 
+                />
+                <div>
+                    <label htmlFor="isKdvExcluded" className="block text-sm font-bold text-white cursor-pointer select-none">Fiyatlar KDV Hariç</label>
+                    <p className="text-xs text-slate-500">Seçilirse, girilen fiyatlar <b>Net</b> kabul edilir ve üzerine KDV eklenerek fatura oluşturulur.</p>
+                </div>
+             </div>
+
              {/* MODEL 1 */}
              <div className="p-4 bg-slate-700/30 rounded-lg border border-slate-600">
                 <div className="flex justify-between items-center mb-3">
@@ -386,7 +402,8 @@ const FirmRegistration = () => {
                         <th className="p-4 text-slate-400">Firma Adı</th>
                         <th className="p-4 text-slate-400">Model</th>
                         <th className="p-4 text-slate-400 text-right">Taban Fiyat</th>
-                         <th className="p-4 text-slate-400 text-center">Hizmet Türü</th>
+                        <th className="p-4 text-slate-400 text-center">Hizmet Türü</th>
+                        <th className="p-4 text-slate-400 text-center">KDV</th>
                         <th className="p-4 text-slate-400 text-center">İşlem</th>
                     </tr>
                 </thead>
@@ -417,6 +434,9 @@ const FirmRegistration = () => {
                                 ) : (
                                     <span className="text-xs bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded">Tümü</span>
                                 )}
+                            </td>
+                            <td className="p-4 text-center text-xs">
+                                {firm.isKdvExcluded ? <span className="text-yellow-500 font-bold">HARİÇ</span> : <span className="text-slate-500">DAHİL</span>}
                             </td>
                             <td className="p-4 text-center">
                                 <div className="flex items-center justify-center gap-2">

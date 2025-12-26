@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Building2, Calculator, Receipt, FileText, Settings, TrendingDown, LifeBuoy } from 'lucide-react';
@@ -23,7 +22,7 @@ const Sidebar = () => {
       <nav className="flex-1 p-4 space-y-1">
         <NavLink to="/" className={navClass}>
           <LayoutDashboard className="w-5 h-5" />
-          <span>Dashboard</span>
+          <span>Ana Sayfa</span>
         </NavLink>
         <NavLink to="/firms" className={navClass}>
           <Building2 className="w-5 h-5" />
@@ -59,7 +58,7 @@ const Sidebar = () => {
       </nav>
 
       <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
-        v1.4.7 • OSGB Fatura Takip
+        v1.4.9 • OSGB Fatura Takip
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { exporter } from '../services/exporter';
 import { cloudService } from '../services/cloud';
-import { Save, Upload, Download, Database, FileSpreadsheet, Cloud, Percent, Landmark, Trash2, AlertOctagon } from 'lucide-react';
+import { Save, Upload, Download, Database, FileSpreadsheet, Cloud, Percent, Landmark, Trash2, AlertOctagon, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { GlobalSettings } from '../types';
 
@@ -86,6 +86,17 @@ const Settings = () => {
       window.location.reload();
   };
 
+  // SADECE HAREKETLERİ SİLME
+  const handleClearTransactions = () => {
+      window.focus();
+      if(!window.confirm("⚠️ SADECE CARİ HAREKETLER SİLİNECEK! \n\nTanımlı firmalar, çalışan sayıları ve fiyat anlaşmaları korunacak.\nAncak tüm fatura ve tahsilat kayıtları silinecek.\n\nDevam edilsin mi?")) return;
+      if(!window.confirm("⚠️ EMİN MİSİNİZ? \n\nBakiyeler sıfırlanacak. Bu işlem geri alınamaz.")) return;
+
+      db.clearAllTransactions();
+      alert("Cari hareketler temizlendi. Firmalar korundu. Sayfa yenileniyor.");
+      window.location.reload();
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
       <header>
@@ -132,11 +143,18 @@ const Settings = () => {
             <AlertOctagon className="w-6 h-6" /> 
             Tehlikeli Bölge
           </h3>
-          <p className="text-slate-400 mb-4 text-sm">Tüm verileri silip uygulamayı ilk haline döndürür. Bu işlem geri alınamaz.</p>
-          <button onClick={handleFactoryReset} className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-colors w-full justify-center">
-              <Trash2 className="w-5 h-5" />
-              FABRİKA AYARLARINA SIFIRLA
-          </button>
+          <p className="text-slate-400 mb-4 text-sm">Verileri silme ve sıfırlama işlemleri.</p>
+          
+          <div className="flex gap-4">
+              <button onClick={handleClearTransactions} className="flex-1 bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-800 px-6 py-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all">
+                  <RefreshCw className="w-5 h-5" />
+                  Sadece Bakiyeleri Sil (Sıfırla)
+              </button>
+              <button onClick={handleFactoryReset} className="flex-1 bg-red-600 hover:bg-red-700 text-white px-6 py-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all">
+                  <Trash2 className="w-5 h-5" />
+                  FABRİKA AYARLARINA DÖN
+              </button>
+          </div>
       </section>
 
       {isElectron && dbPath && <div className="text-center text-xs text-slate-600 mt-4"><code className="bg-black/30 p-1 rounded">{dbPath}</code></div>}

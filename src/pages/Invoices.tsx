@@ -110,7 +110,8 @@ const CopyBadge = ({ text, label, title, className, valueToCopy }: { text?: stri
 };
 
 // --- SMART TEXT COPY BUTTON ---
-const SmartCopyButton = ({ inv, globalSettings, allTransactions }: { inv: Transaction, globalSettings: any, allTransactions: Transaction[] }) => {
+// firmId'si aynı olan VEYA parentFirmId'si bu fatura sahibi olanları toplar.
+const SmartCopyButton = ({ inv, globalSettings, allTransactions, firms }: { inv: Transaction, globalSettings: any, allTransactions: Transaction[], firms: Firm[] }) => {
     const [copied, setCopied] = useState(false);
 
     const handleSmartTextCopy = (e: React.MouseEvent) => {
@@ -118,19 +119,39 @@ const SmartCopyButton = ({ inv, globalSettings, allTransactions }: { inv: Transa
         window.focus();
         try {
             const textAmount = numberToTurkishText(inv.debt);
-            const firmTrans = allTransactions.filter(t => t.firmId === inv.firmId && (t.status === 'APPROVED' || !t.status));
+
+            // --- GELİŞMİŞ BAKİYE HESAPLAMA (ŞUBELER DAHİL) ---
+            
+            // 1. Hedef Firmaları Bul (Kendisi + Şubeleri)
+            const targetIds = [inv.firmId];
+            const branches = firms.filter(f => f.parentFirmId === inv.firmId);
+            branches.forEach(b => targetIds.push(b.id));
+
+            // 2. Bu ID'lere ait tüm ONAYLI işlemleri bul
+            const firmTrans = allTransactions.filter(t => 
+                targetIds.includes(t.firmId) && 
+                (t.status === 'APPROVED' || !t.status)
+            );
+
             const totalDebited = firmTrans.reduce((sum, t) => sum + t.debt, 0);
             const totalPaid = firmTrans.reduce((sum, t) => sum + t.credit, 0);
             const priorBalance = totalDebited - totalPaid;
 
             let finalStr = textAmount;
-            // Geçmiş bakiye varsa ekle
+            // Geçmiş bakiye varsa ekle (Şubeler dahil)
             if (priorBalance > 0.1) {
+                // Not: inv.debt (şu anki fatura) henüz 'PENDING' ise firmTrans içinde yoktur.
+                // Bu yüzden toplam borcu hesaplarken üzerine ekliyoruz.
                 const totalDebt = priorBalance + inv.debt;
+                
                 const dateStr = new Date().toLocaleDateString('tr-TR');
                 const formattedTotal = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalDebt);
                 const bankText = globalSettings.bankInfo || '';
-                finalStr += ` "${dateStr} Tarihi itibariyle Borç Bakiyesi: ${formattedTotal}'dir. ${bankText}`;
+                
+                // Eğer şube varsa bilgi notu ekle
+                const branchNote = branches.length > 0 ? ` (Şubeler Dahil)` : '';
+
+                finalStr += ` "${dateStr} Tarihi itibariyle${branchNote} Borç Bakiyesi: ${formattedTotal}'dir. ${bankText}`;
             }
             
             safeCopyToClipboard(finalStr).then(() => {
@@ -152,7 +173,7 @@ const SmartCopyButton = ({ inv, globalSettings, allTransactions }: { inv: Transa
                     : 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:opacity-80'
                 }
             `}
-            title="Yazı ile Kopyala (Parlak Renk)"
+            title="Yazı ile Kopyala (Şubeler Dahil)"
         >
             {copied ? <Check className="w-4 h-4 animate-in zoom-in" /> : <ClipboardCopy className="w-4 h-4" />}
         </button>
@@ -169,6 +190,7 @@ const Invoices = () => {
   const [pendingInvoices, setPendingInvoices] = useState<InvoiceWithDetails[]>([]);
   const [approvedInvoices, setApprovedInvoices] = useState<InvoiceWithDetails[]>([]);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [firms, setFirms] = useState<Firm[]>([]); // Firmaları state'e aldık
   const [showHistory, setShowHistory] = useState(false);
   const [globalSettings, setGlobalSettings] = useState(db.getGlobalSettings());
   const [filterType, setFilterType] = useState<'ALL' | InvoiceType>('ALL');
@@ -181,6 +203,8 @@ const Invoices = () => {
     setAllTransactions(allTrans); // Smart copy için ham veri
     
     const allFirms = db.getFirms();
+    setFirms(allFirms); // Firmaları kaydet (Smart copy için gerekli)
+
     const firmMap = new Map<string, Firm>();
     allFirms.forEach(f => firmMap.set(f.id, f));
 
@@ -372,10 +396,16 @@ const Invoices = () => {
                     </div>
                   </td>
 
-                  {/* SAĞLIK */}
+                  {/* SAĞLIK (Animasyonlu) */}
                   <td className="p-4 text-center text-sm">
                     <div className="flex flex-col items-center gap-1">
-                        <span className="font-medium text-slate-300">{formatCurrency(netHealth)}</span>
+                        {netHealth > 0.01 ? (
+                            <span className="font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/50 px-3 py-1 rounded-lg animate-pulse shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                                {formatCurrency(netHealth)}
+                            </span>
+                        ) : (
+                            <span className="font-medium text-slate-300">{formatCurrency(netHealth)}</span>
+                        )}
                         <CopyBadge text={netHealth} />
                     </div>
                   </td>
@@ -391,7 +421,7 @@ const Invoices = () => {
                   <td className="p-4 text-center text-xs text-slate-500">{inv.invoiceType}</td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                        <SmartCopyButton inv={inv} globalSettings={globalSettings} allTransactions={allTransactions} />
+                        <SmartCopyButton inv={inv} globalSettings={globalSettings} allTransactions={allTransactions} firms={firms} />
                         <button onClick={() => handleApprove(inv.id)} className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-lg shadow-emerald-900/20" title="Onayla"><CheckCircle className="w-4 h-4" /></button>
                     </div>
                   </td>

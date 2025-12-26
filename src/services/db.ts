@@ -1,4 +1,3 @@
-
 import { Firm, Transaction, TransactionType, PreparationItem, InvoiceType, GlobalSettings, PricingModel, LogEntry, PricingTier, ServiceType } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -177,11 +176,16 @@ export const db = {
     setStorage(STORAGE_KEYS.TRANSACTIONS, transactions.filter(t => t.id !== id));
   },
 
-  // Fix: Adding deleteTransactionsBulk to support bulk deletion in Invoices page
   deleteTransactionsBulk: (ids: string[]) => {
     const transactions = getStorage<Transaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
     setStorage(STORAGE_KEYS.TRANSACTIONS, transactions.filter(t => !ids.includes(t.id)));
     db.addLog('Toplu Fatura Silme', `${ids.length} fatura silindi.`);
+  },
+
+  // SADECE HAREKETLERİ SİLME (YENİ)
+  clearAllTransactions: () => {
+      setStorage(STORAGE_KEYS.TRANSACTIONS, []);
+      db.addLog('Veri Temizliği', 'Tüm cari hareketler silindi.');
   },
 
   getPreparationItems: (): PreparationItem[] => getStorage<PreparationItem[]>(STORAGE_KEYS.PREPARATION, []),
@@ -201,7 +205,7 @@ export const db = {
       globalSettings: getStorage(STORAGE_KEYS.GLOBAL_SETTINGS, {}),
       logs: getStorage(STORAGE_KEYS.LOGS, []),
       backupDate: new Date().toISOString(),
-      version: '1.4.6'
+      version: '1.4.9'
   }),
 
   restoreBackup: (data: any) => {
@@ -235,19 +239,19 @@ export const db = {
       
       const newId = generateId();
       const isExclVAT = (row['Fiyatlar KDV Hariç mi?'] || '').toString().toLowerCase() === 'evet';
-      const vatMultiplier = isExclVAT ? 1.2 : 1;
       
       const newFirm: Firm = {
         id: newId,
         name: name,
         basePersonLimit: Number(row['Taban Kişi']) || 0,
-        baseFee: (Number(row['Taban Ücret']) || 0) * vatMultiplier,
-        extraPersonFee: (Number(row['Ekstra Kişi Ücreti']) || 0) * vatMultiplier,
+        baseFee: (Number(row['Taban Ücret']) || 0), // Artık çarpan yok, KDV Hariç bayrağı var
+        extraPersonFee: (Number(row['Ekstra Kişi Ücreti']) || 0),
         defaultInvoiceType: row['Fatura Tipi'] === 'E-Arşiv' ? InvoiceType.E_ARSIV : InvoiceType.E_FATURA,
         taxNumber: row['Vergi No']?.toString() || '',
         address: row['Adres']?.toString() || '',
         pricingModel: PricingModel.STANDARD,
-        serviceType: ServiceType.BOTH
+        serviceType: ServiceType.BOTH,
+        isKdvExcluded: isExclVAT // Yeni Alan
       };
       currentFirms.push(newFirm);
       newFirmsCount++;
