@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Transaction, TransactionType, InvoiceType, Firm } from '../types';
 import { exporter } from '../services/exporter';
-import { Receipt, CheckCircle, Trash2, History, FileDown, FileSpreadsheet, Copy, ClipboardCopy, Filter, CheckSquare, Square, Check } from 'lucide-react';
+import { Receipt, CheckCircle, Trash2, History, FileDown, FileSpreadsheet, Copy, ClipboardCopy, Filter, CheckSquare, Square, Check, FileCheck } from 'lucide-react';
 
 // --- YARDIMCI FONKSİYONLAR ---
 
@@ -267,11 +267,11 @@ const Invoices = () => {
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
 
+  // GÖRÜNEN LİSTEYİ (BEKLEYENLERİ) İNDİR
   const handleExportExcel = () => {
     const dataToExport = [...filteredPending, ...(showHistory ? filteredApproved : [])].map(inv => {
         const netExpert = (inv.calculatedDetails?.expertShare || 0) / (1 + globalSettings.vatRateExpert / 100);
         const netDoctor = (inv.calculatedDetails?.doctorShare || 0) / (1 + globalSettings.vatRateDoctor / 100);
-        // Sağlık Net = Brüt / (1 + KDV)
         const netHealth = (inv.calculatedDetails?.extraItemAmount || 0) / (1 + globalSettings.vatRateHealth / 100);
         const annual = inv.calculatedDetails?.yearlyFeeAmount || 0;
 
@@ -288,7 +288,35 @@ const Invoices = () => {
             'Açıklama': inv.description
         };
     });
-    exporter.exportToExcel('Detayli_Fatura_Listesi', dataToExport);
+    exporter.exportToExcel('Taslak_Fatura_Listesi', dataToExport);
+  };
+
+  // SADECE ONAYLANANLARI (GEÇMİŞİ) İNDİR
+  const handleExportApprovedExcel = () => {
+    if (approvedInvoices.length === 0) return alert("Henüz onaylanmış fatura bulunmamaktadır.");
+    
+    const dataToExport = approvedInvoices.map(inv => {
+        // NET Hesaplama
+        const netExpert = (inv.calculatedDetails?.expertShare || 0) / (1 + globalSettings.vatRateExpert / 100);
+        const netDoctor = (inv.calculatedDetails?.doctorShare || 0) / (1 + globalSettings.vatRateDoctor / 100);
+        const netHealth = (inv.calculatedDetails?.extraItemAmount || 0) / (1 + globalSettings.vatRateHealth / 100);
+        const annual = inv.calculatedDetails?.yearlyFeeAmount || 0;
+
+        return {
+            'Tarih': new Date(inv.date).toLocaleDateString('tr-TR'),
+            'Firma Adı': inv.firmName,
+            'Vergi No': inv.taxNumber || '-',
+            'Fatura Tipi': inv.invoiceType,
+            'Açıklama': inv.description,
+            'Uzman Hakediş (Net)': Number(netExpert.toFixed(2)),
+            'Doktor Hakediş (Net)': Number(netDoctor.toFixed(2)),
+            'Sağlık Hizmeti (Net)': Number(netHealth.toFixed(2)),
+            'Yıllık Ücret (Brüt)': annual,
+            'FATURA TOPLAMI (KDV DAHİL)': inv.debt
+        };
+    });
+    
+    exporter.exportToExcel(`Kesilen_Faturalar_Raporu_${new Date().toLocaleDateString('tr-TR')}`, dataToExport);
   };
 
   return (
@@ -310,7 +338,8 @@ const Invoices = () => {
               <option value={InvoiceType.E_ARSIV}>E-Arşiv</option>
             </select>
           </div>
-          <button onClick={handleExportExcel} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm transition-colors"><FileSpreadsheet className="w-4 h-4" /> Excel</button>
+          <button onClick={handleExportExcel} className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-2 rounded-lg text-sm transition-colors" title="Ekrandaki listeyi indir"><FileSpreadsheet className="w-4 h-4" /> Excel (Taslak)</button>
+          <button onClick={handleExportApprovedExcel} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 text-white px-3 py-2 rounded-lg text-sm transition-colors shadow-lg shadow-blue-900/20" title="Tüm onaylanmış faturaları indir"><FileCheck className="w-4 h-4" /> Resmileşenleri İndir</button>
           <button onClick={() => setShowHistory(!showHistory)} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${showHistory ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}><History className="w-4 h-4" /> {showHistory ? 'Gizle' : 'Geçmiş'}</button>
         </div>
       </header>

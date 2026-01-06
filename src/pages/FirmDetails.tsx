@@ -1,8 +1,9 @@
+
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Firm, Transaction, TransactionType, GlobalSettings, PricingModel, PricingTier, ServiceType } from '../types';
 import { exporter } from '../services/exporter';
-import { FileText, Search, PlusCircle, ArrowDownLeft, ArrowUpRight, Building2, Download, Table, FilePlus, Calendar, Trash2, Filter, RefreshCw, Layers, Plus, X, CheckCircle, ArrowRightCircle, AlertCircle, Save, Calculator } from 'lucide-react';
+import { FileText, Search, PlusCircle, ArrowDownLeft, ArrowUpRight, Building2, Download, Table, FilePlus, Calendar, Trash2, Filter, RefreshCw, Layers, Plus, X, CheckCircle, ArrowRightCircle, AlertCircle, Save, Calculator, CalendarRange } from 'lucide-react';
 
 const FirmDetails = () => {
   const [firms, setFirms] = useState<Firm[]>([]);
@@ -14,6 +15,8 @@ const FirmDetails = () => {
   
   // Filtreler
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Varsayılan olarak "Bu Yıl" seçili gelir.
   const [dateRange, setDateRange] = useState({
       start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], // Yılın ilk günü
       end: new Date().toISOString().split('T')[0] // Bugün
@@ -39,7 +42,6 @@ const FirmDetails = () => {
 
   // --- HAVUZ MODAL STATE ---
   const [isPoolModalOpen, setIsPoolModalOpen] = useState(false);
-  // employeeCount eklendi: Artık içeride hesaplama yapabiliriz
   const [poolItems, setPoolItems] = useState<{firmId?: string, firmName: string, amount: string, hasDraft?: boolean, employeeCount?: number, isKdvExcluded?: boolean}>([{firmId: '', firmName: '', amount: '', hasDraft: false, employeeCount: 0, isKdvExcluded: false}]);
   const [poolRatios, setPoolRatios] = useState({ expert: 60, doctor: 40 });
 
@@ -61,9 +63,11 @@ const FirmDetails = () => {
           targetIds.includes(t.firmId) && (t.status === 'APPROVED' || t.status === undefined)
       );
 
+      // Başlangıç ve Bitiş Tarihlerini Zaman Damgasına Çevir
       const startDateTimestamp = new Date(dateRange.start).setHours(0,0,0,0);
       const endDateTimestamp = new Date(dateRange.end).setHours(23,59,59,999);
 
+      // 1. Devreden Bakiyeyi Hesapla (Seçilen tarihten öncekiler)
       const previousTrans = firmAllTrans.filter(t => new Date(t.date).getTime() < startDateTimestamp);
       const prevDebt = previousTrans.reduce((sum, t) => sum + t.debt, 0);
       const prevCredit = previousTrans.reduce((sum, t) => sum + t.credit, 0);
@@ -71,6 +75,7 @@ const FirmDetails = () => {
       
       setOpeningBalance(calculatedOpening);
 
+      // 2. Tablo Verisini Filtrele (Seçilen tarih aralığı)
       const rangeTrans = firmAllTrans
         .filter(t => {
             const d = new Date(t.date).getTime();
@@ -91,11 +96,26 @@ const FirmDetails = () => {
       window.focus();
       if(window.confirm(`Bu ${type} kaydını silmek istediğinize emin misiniz? Bakiye değişecektir.`)) {
           db.deleteTransaction(id);
+          // Refresh trigger (re-set ID to trigger effect)
           const current = selectedFirmId;
           setSelectedFirmId('');
           setTimeout(() => setSelectedFirmId(current), 50);
           window.focus();
       }
+  };
+
+  const handleShowAllHistory = () => {
+      setDateRange({
+          start: '2020-01-01', // Yeterince eski bir tarih
+          end: new Date().toISOString().split('T')[0]
+      });
+  };
+
+  const handleShowThisYear = () => {
+      setDateRange({ 
+          start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], 
+          end: new Date().toISOString().split('T')[0] 
+      });
   };
 
   const exportSingleFirm = () => {
@@ -456,17 +476,31 @@ const FirmDetails = () => {
                   </div>
 
                   {/* Alt Satır: Tarih Filtreleri */}
-                  <div className="flex items-center gap-4 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
+                  <div className="flex flex-col md:flex-row items-center gap-4 bg-slate-900/50 p-2 rounded-lg border border-slate-700/50">
                       <div className="flex items-center gap-2">
                           <Filter className="w-4 h-4 text-slate-500" />
-                          <span className="text-sm text-slate-400 font-medium">Tarih Aralığı:</span>
+                          <span className="text-sm text-slate-400 font-medium whitespace-nowrap">Tarih Aralığı:</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                          <input type="date" value={dateRange.start} onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))} className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white outline-none focus:border-blue-500" />
+                      <div className="flex items-center gap-2 w-full md:w-auto">
+                          <input type="date" value={dateRange.start} onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))} className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white outline-none focus:border-blue-500 cursor-pointer" />
                           <span className="text-slate-500">-</span>
-                          <input type="date" value={dateRange.end} onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))} className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white outline-none focus:border-blue-500" />
+                          <input type="date" value={dateRange.end} onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))} className="bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white outline-none focus:border-blue-500 cursor-pointer" />
                       </div>
-                      <button onClick={() => setDateRange({ start: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0], end: new Date().toISOString().split('T')[0] })} className="ml-auto text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"><RefreshCw className="w-3 h-3" /> Bu Yıl</button>
+                      
+                      <div className="flex gap-2 ml-auto">
+                        <button 
+                            onClick={handleShowThisYear} 
+                            className="text-xs bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 px-3 py-1.5 rounded border border-slate-700 flex items-center gap-1 transition-colors"
+                        >
+                            <RefreshCw className="w-3 h-3" /> Bu Yıl
+                        </button>
+                        <button 
+                            onClick={handleShowAllHistory} 
+                            className="text-xs bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 px-3 py-1.5 rounded border border-slate-700 flex items-center gap-1 transition-colors"
+                        >
+                            <CalendarRange className="w-3 h-3" /> Tüm Geçmiş
+                        </button>
+                      </div>
                   </div>
               </div>
 
