@@ -1,53 +1,8 @@
 
-export interface Firm {
-  id: string;
-  name: string;
-  parentFirmId?: string; // Ana Firma ID'si (Şube mantığı için)
-  basePersonLimit: number; // Taban Kişi Limiti (Standart ve Tolerans için merkez)
-  baseFee: number; // Taban Ücret
-  extraPersonFee: number; // Ekstra Kişi Ücreti (Limit aşımı veya düşümü için)
-  defaultInvoiceType: InvoiceType;
-  
-  // Hizmet Türü
-  serviceType: ServiceType; // 'BOTH' | 'EXPERT_ONLY' | 'DOCTOR_ONLY'
-
-  // KDV Durumu (Yeni)
-  isKdvExcluded?: boolean; // Eğer true ise, girilen fiyatlar NET kabul edilir, üzerine KDV eklenir.
-
-  // Yıllık Ücret
-  yearlyFee?: number; // Yılda bir kez alınacak ücret
-  
-  // E-Arşiv Özel Bilgileri
-  taxNumber?: string;
-  address?: string;
-  
-  // Fiyatlandırma Modeli 1 (Ana)
-  pricingModel: PricingModel;
-  tolerancePercentage?: number; // Toleranslı model için % (Örn: 10)
-  tiers?: PricingTier[]; // Kademeli model için aralıklar
-
-  // Fiyatlandırma Modeli 2 (Opsiyonel / Ek Hizmet)
-  hasSecondaryModel?: boolean;
-  secondaryPricingModel?: PricingModel;
-  secondaryBaseFee?: number;
-  secondaryBasePersonLimit?: number;
-  secondaryExtraPersonFee?: number;
-  secondaryTiers?: PricingTier[];
-
-  // HAVUZ AYARLARI (YENİ)
-  savedPoolConfig?: string[]; // Havuza dahil edilecek firma ID'lerinin listesi
-}
-
-export enum ServiceType {
-  BOTH = 'TÜMÜ',
-  EXPERT_ONLY = 'SADECE_UZMAN',
-  DOCTOR_ONLY = 'SADECE_HEKIM'
-}
-
 export enum PricingModel {
   STANDARD = 'STANDART',
-  TOLERANCE = 'TOLERANSLI', // % Alt ve Üst tolerans
-  TIERED = 'KADEMELI' // Aralık bazlı (0-10, 11-20 vs)
+  TOLERANCE = 'TOLERANSLI',
+  TIERED = 'KADEMELI'
 }
 
 export interface PricingTier {
@@ -56,14 +11,41 @@ export interface PricingTier {
   price: number;
 }
 
-export interface GlobalSettings {
+export enum ServiceType {
+  BOTH = 'BOTH',
+  EXPERT_ONLY = 'EXPERT_ONLY',
+  DOCTOR_ONLY = 'DOCTOR_ONLY'
+}
+
+export interface Firm {
+  id: string;
+  name: string;
+  basePersonLimit: number;
+  baseFee: number;
+  extraPersonFee: number;
   expertPercentage: number;
   doctorPercentage: number;
-  reportEmail?: string;
-  vatRateExpert: number;
-  vatRateDoctor: number;
-  vatRateHealth: number;
-  bankInfo: string; // Banka ve IBAN Bilgisi Metni
+  defaultInvoiceType: InvoiceType;
+  
+  // Extended properties for Advanced Pricing & Features
+  parentFirmId?: string;
+  taxNumber?: string;
+  address?: string;
+  yearlyFee?: number;
+  pricingModel: PricingModel;
+  tolerancePercentage?: number;
+  tiers?: PricingTier[];
+  serviceType?: ServiceType;
+  isKdvExcluded?: boolean;
+  savedPoolConfig?: string[];
+
+  // Secondary Model Configuration
+  hasSecondaryModel?: boolean;
+  secondaryPricingModel?: PricingModel;
+  secondaryBaseFee?: number;
+  secondaryBasePersonLimit?: number;
+  secondaryExtraPersonFee?: number;
+  secondaryTiers?: PricingTier[];
 }
 
 export enum TransactionType {
@@ -83,21 +65,20 @@ export interface Transaction {
   firmId: string;
   date: string;
   type: TransactionType;
-  invoiceType?: InvoiceType; // Sadece fatura ise
+  invoiceType?: InvoiceType;
   description: string;
-  debt: number; // Borç (Kesilen Fatura)
-  credit: number; // Alacak (Ödenen Para)
+  debt: number;
+  credit: number;
   month: number;
   year: number;
-  status: TransactionStatus; // Onay durumu
-  // Hesaplama detaylarını saklamak için (Historical data)
+  status: TransactionStatus;
   calculatedDetails?: {
     employeeCount: number;
-    extraItemAmount: number; // Sağlık Ücreti (BRÜT)
-    yearlyFeeAmount?: number; // Eklenen Yıllık Ücret
-    serviceAmount?: number; // Hakedişe konu olan saf hizmet bedeli (BRÜT)
-    expertShare: number; // BRÜT Uzman Payı
-    doctorShare: number; // BRÜT Doktor Payı
+    extraItemAmount: number;
+    expertShare: number;
+    doctorShare: number;
+    serviceAmount?: number;
+    yearlyFeeAmount?: number;
   };
 }
 
@@ -105,7 +86,17 @@ export interface PreparationItem {
   firmId: string;
   currentEmployeeCount: number;
   extraItemAmount: number;
-  addYearlyFee?: boolean; // Bu ay yıllık ücret eklensin mi?
+  addYearlyFee?: boolean;
+}
+
+export interface GlobalSettings {
+  expertPercentage: number;
+  doctorPercentage: number;
+  vatRateExpert: number;
+  vatRateDoctor: number;
+  vatRateHealth: number;
+  reportEmail?: string;
+  bankInfo: string;
 }
 
 export interface LogEntry {

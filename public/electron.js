@@ -1,35 +1,121 @@
 
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
 const { autoUpdater } = require('electron-updater');
 
-// Loglama (Opsiyonel ama hata ayıklama için iyidir)
-// autoUpdater.logger = require("electron-log");
-// autoUpdater.logger.transports.file.level = "info";
+// --- SERVER AYARLARI (Telefondan Erişim İçin) ---
+const SERVER_PORT = 5000;
+const serverApp = express();
+
+// --- TEK GERÇEK KAYNAK: Veritabanı Yolu ---
+const getDbPath = () => {
+    const APPDATA = process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Preferences' : process.env.HOME + "/.local/share");
+    const dir = path.join(APPDATA, 'OSGB Fatura Takip');
+    
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+    
+    return path.join(dir, 'database.json');
+};
+
+const dbPath = getDbPath();
+
+const log = (msg) => {
+    const time = new Date().toLocaleTimeString();
+    console.log(`[${time}] ${msg}`);
+};
+
+// Middleware
+serverApp.use(cors());
+serverApp.use(bodyParser.json({ limit: '50mb' }));
+
+// 1. Statik Dosyaları Sun
+// Üretim modunda __dirname zaten 'build' klasörüdür. Geliştirme modunda '../build' gerekir.
+const buildPath = app.isPackaged 
+    ? path.join(__dirname) 
+    : path.join(__dirname, '../build');
+
+if (fs.existsSync(buildPath)) {
+    serverApp.use(express.static(buildPath));
+}
+
+// 2. API: Veritabanını Oku (GET)
+serverApp.get('/api/db', (req, res) => {
+  if (fs.existsSync(dbPath)) {
+    try {
+      const data = fs.readFileSync(dbPath, 'utf-8');
+      res.json(data ? JSON.parse(data) : {});
+    } catch (e) {
+      res.json({}); 
+    }
+  } else {
+    res.json({}); 
+  }
+});
+
+// 3. API: Veritabanını Güncelle (POST)
+serverApp.post('/api/db', (req, res) => {
+  try {
+    const data = req.body;
+    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: 'Veritabanı yazılamadı' });
+  }
+});
+
+// React Router Yönlendirmesi
+serverApp.get('*', (req, res) => {
+  if (fs.existsSync(path.join(buildPath, 'index.html'))) {
+      res.sendFile(path.join(buildPath, 'index.html'));
+  } else {
+      res.send(`<h1>Sistem Başlatılıyor...</h1>`);
+  }
+});
+
+// Sunucuyu Başlat
+let server;
+const startServer = () => {
+    server = serverApp.listen(SERVER_PORT, '0.0.0.0', () => {
+        console.log(`\n✅ SUNUCU AKTİF: http://localhost:${SERVER_PORT}`);
+        console.log(`📂 VERİTABANI: ${dbPath}\n`);
+    });
+}
+
+// --------------------------------------------------
+// ELECTRON PENCERE YÖNETİMİ
+// --------------------------------------------------
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1280,
     height: 850,
-    minWidth: 400,
-    minHeight: 300,
-    resizable: true,
+    minWidth: 800,
+    minHeight: 600,
     title: "OSGB Fatura Takip",
+    // İkon hem dev hem prod modunda yanındadır
     icon: path.join(__dirname, 'favicon.ico'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      devTools: false // Prodüksiyonda false
+      devTools: false 
     },
     autoHideMenuBar: true,
     frame: true
   });
 
-  const startUrl = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, '../build/index.html')}`;
+  // KRİTİK PATH DÜZELTMESİ:
+  // Packaged (EXE) ise: index.html electron.js ile aynı klasördedir.
+  // Dev ise: index.html bir üst klasördeki build içindedir.
+  const startUrl = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, app.isPackaged ? 'index.html' : '../build/index.html')}`;
   
   win.loadURL(startUrl);
 
-  // Dış bağlantıları varsayılan tarayıcıda aç
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https:') || url.startsWith('http:')) {
       shell.openExternal(url);
@@ -38,42 +124,32 @@ function createWindow() {
     return { action: 'allow' };
   });
 
-  // --- GÜNCELLEME KONTROLÜ ---
-  
-  // Uygulama tamamen yüklendikten ve pencere açıldıktan sonra kontrol et
   win.once('ready-to-show', () => {
-    // Sadece paketlenmiş (prodüksiyon) uygulamada çalışır
-    if (app.isPackaged) {
-      autoUpdater.checkForUpdatesAndNotify();
-    }
+    if (app.isPackaged) autoUpdater.checkForUpdatesAndNotify();
   });
 
-  // Güncelleme mevcut
-  autoUpdater.on('update-available', () => {
-    win.webContents.send('update_available');
-  });
-
-  // Güncelleme indirildi
-  autoUpdater.on('update-downloaded', () => {
-    win.webContents.send('update_downloaded');
-  });
+  autoUpdater.on('update-available', () => win.webContents.send('update_available'));
+  autoUpdater.on('update-downloaded', () => win.webContents.send('update_downloaded'));
 }
 
-// React tarafından gelen "Yeniden Başlat" emri
-ipcMain.on('restart_app', () => {
-  autoUpdater.quitAndInstall();
+ipcMain.on('get-db-path', (event) => {
+    event.returnValue = dbPath; 
 });
 
-app.whenReady().then(createWindow);
+ipcMain.on('restart_app', () => autoUpdater.quitAndInstall());
+
+app.whenReady().then(() => {
+    startServer();
+    createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    if (server) server.close(); 
     app.quit();
   }
 });
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });

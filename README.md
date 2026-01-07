@@ -1,120 +1,102 @@
+
 <div align="center">
   
-  <!-- LOGO VEYA BANNER ALANI -->
-  <!-- Buraya ileride projenin logosunu veya banner görselini ekleyebilirsin: -->
-  <!-- <img src="docs/banner.png" alt="OSGB ProFinans Banner" width="100%" /> -->
-  
-  <img src="public/logo.svg" alt="Logo" width="100" height="100" />
+  <img src="public/logo.svg" alt="OSGB Pro Logo" width="120" height="120" />
 
-  # 🏢 OSGB ProFinans
-  
-  **Yeni Nesil Ön Muhasebe, Hakediş ve Finans Yönetim Otomasyonu**
+  # 🏥 OSGB ProFinans
+
+  **OSGB ve Hizmet Sektörü İçin Akıllı Finans & Hakediş Yönetimi**
   
   <p>
-    OSGB'ler ve çalışan sayısına dayalı hizmet veren firmalar için geliştirilmiş;<br>
-    React ve Electron tabanlı, çevrimdışı çalışabilen masaüstü uygulaması.
+    Otomatik hakediş hesaplama, akıllı havuz yönetimi ve hibrit (offline/online) veri mimarisi ile<br>
+    OSGB'lerin finansal süreçlerini dijitalleştiren profesyonel masaüstü uygulaması.
   </p>
 
-  <!-- ROZETLER -->
   <p>
-    <img src="https://img.shields.io/badge/versiyon-1.5.0-blue.svg?style=flat-square" alt="Versiyon">
-    <img src="https://img.shields.io/badge/lisans-MIT-green.svg?style=flat-square" alt="Lisans">
-    <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Mac-lightgrey.svg?style=flat-square" alt="Platform">
-    <br>
-    <img src="https://img.shields.io/badge/React-18-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black" alt="React">
-    <img src="https://img.shields.io/badge/TypeScript-007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
-    <img src="https://img.shields.io/badge/Electron-47848F.svg?style=for-the-badge&logo=electron&logoColor=white" alt="Electron">
-    <img src="https://img.shields.io/badge/Tailwind-38B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind">
+    <img src="https://img.shields.io/badge/v2.0.0-Stable-emerald?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/React-v18-blue?style=flat-square&logo=react" alt="React">
+    <img src="https://img.shields.io/badge/Electron-Desktop-purple?style=flat-square&logo=electron" alt="Electron">
+    <img src="https://img.shields.io/badge/License-MIT-gray?style=flat-square" alt="License">
   </p>
+
 </div>
 
 ---
 
-## 📸 Ekran Görüntüleri ve Önizleme
+## 👁️ Önizleme ve Galeri
 
-<!-- 
-    NOT: Burası resim ve GIF'ler için ayrılmış alandır. 
-    Projenin ekran görüntülerini aldığında 'docs' klasörüne atıp aşağıdaki linkleri güncelleyebilirsin.
--->
+Proje, kullanıcı dostu **Dark Mode** arayüzü ile tasarlanmıştır.
 
-| **Genel Bakış (Dashboard)** | **Fatura Hazırlık & Havuz** |
-|:---------------------------:|:---------------------------:|
-| <img src="https://placehold.co/600x400/1e293b/FFF?text=Dashboard+Gorseli+Buraya" alt="Dashboard" width="100%"> | <img src="https://placehold.co/600x400/1e293b/FFF?text=Fatura+Hesaplama+Gorseli" alt="Fatura Modülü" width="100%"> |
-| *Finansal durum, anlık ciro ve grafikler* | *Otomatik hakediş hesaplama ve havuz yönetimi* |
+### 🎥 Tanıtım Videosu
+<!-- Buraya uygulamanın çalıştığını gösteren bir GIF veya YouTube linki ekleyin -->
+<div align="center">
+  <img src="https://via.placeholder.com/800x450/1e293b/FFFFFF?text=Uygulama+Tanıtım+Videosu+(Buraya+GIF+Gelecek)" alt="Demo Video" width="100%" />
+</div>
 
-| **Borç Yaşlandırma Analizi** | **Ayarlar & Veri Yönetimi** |
-|:----------------------------:|:---------------------------:|
-| <img src="https://placehold.co/600x400/1e293b/FFF?text=Borc+Yaslandirma+Gorseli" alt="Borç Takip" width="100%"> | <img src="https://placehold.co/600x400/1e293b/FFF?text=Ayarlar+ve+Yedekleme" alt="Ayarlar" width="100%"> |
-| *Riskli bakiyelerin zaman bazlı analizi* | *Excel import/export ve Bulut yedekleme* |
+### 📸 Ekran Görüntüleri
 
----
+| **Ana Kontrol Paneli (Dashboard)** | **Fatura Hazırlık Motoru** |
+|:---:|:---:|
+| <img src="https://via.placeholder.com/600x350/0f172a/FFFFFF?text=Dashboard+Görseli" alt="Dashboard" width="100%"> | <img src="https://via.placeholder.com/600x350/0f172a/FFFFFF?text=Fatura+Hesaplama" alt="Fatura Hazırlık" width="100%"> |
+| *Anlık finansal durum, grafikler ve özetler* | *Sözleşme kurallarına göre otomatik hesaplama* |
 
-## 🚀 Temel Özellikler
-
-### ⚡ Akıllı Hakediş Motoru
-Excel tablolarıyla uğraşmaya son. Sözleşme kurallarını bir kez girin, sistem her ay çalışan sayısına göre faturayı otomatik hesaplasın.
-*   **Standart Model:** Limit aşımına göre ek ücret.
-*   **Toleranslı Model:** Belirli % sapmalara kadar sabit fiyat.
-*   **Kademeli (Tiered) Model:** (0-50 kişi arası X TL, 51-100 arası Y TL).
-
-### 🔗 Gelişmiş Havuz (Şube) Yönetimi
-Dağınık şubeleri olan müşterilerinizi tek çatı altında toplayın.
-*   Şubelerin çalışan sayılarını ayrı ayrı girin.
-*   Sistem, tüm şubeleri **Ana Firma** altında otomatik birleştirir.
-*   Tek tıkla konsolide fatura oluşturur.
-
-### 📉 Borç Yaşlandırma (Debt Aging)
-Tahsilat riskini minimize edin.
-*   Hangi firma ne kadar süredir ödeme yapmıyor? (1-12 Ay Analizi)
-*   Riskli firmaları renk kodlarıyla (Kırmızı/Turuncu) görselleştirin.
-
-### ☁️ Hibrit Veri Mimarisi (Offline-First)
-*   **Tamamen Yerel:** İnternet olmasa bile çalışır. Veriler `localStorage` ve dosya sisteminde şifreli tutulur.
-*   **Bulut Senkronizasyon:** İsterseniz **Google Firebase** entegrasyonu ile verilerinizi ofis ve ev arasında eşitleyebilirsiniz.
+| **Firma ve Sözleşme Yönetimi** | **Borç Takip ve Analiz** |
+|:---:|:---:|
+| <img src="https://via.placeholder.com/600x350/0f172a/FFFFFF?text=Firma+Yönetimi" alt="Firma Yönetimi" width="100%"> | <img src="https://via.placeholder.com/600x350/0f172a/FFFFFF?text=Borç+Yaşlandırma" alt="Borç Takip" width="100%"> |
+| *Detaylı fiyatlandırma ve model ayarları* | *Gecikmiş ödemelerin risk analizi* |
 
 ---
 
-## 🛠️ Kurulum ve Geliştirme
+## ✨ Temel Özellikler
 
-Projeyi bilgisayarınıza klonlayıp geliştirmeye başlamak için:
-
-```bash
-# 1. Repoyu klonlayın
-git clone https://github.com/kullaniciadi/osgb-profinans.git
-
-# 2. Proje dizinine girin
-cd osgb-profinans
-
-# 3. Bağımlılıkları yükleyin
-npm install
-
-# 4. Geliştirme modunda başlatın (Web + Electron)
-npm run electron:dev
-```
-
-### 📦 Exe Olarak Derleme (Build)
-
-Windows için kurulabilir `.exe` dosyası oluşturmak için:
-
-```bash
-npm run electron:build
-```
-*Çıktı dosyası `dist/` klasöründe oluşacaktır.*
+*   **⚡ Akıllı Hesaplama Motoru:** Standart, Toleranslı veya Kademeli fiyatlandırma modellerini firmalara özel tanımlayın. Her ay çalışan sayısını girin, gerisini sisteme bırakın.
+*   **🔗 Havuz (Şube) Sistemi:** Ana firma ve şubelerini birbirine bağlayın. Sistem tüm şubeleri hesaplayıp tek bir "Çatı Fatura" taslağı oluşturur.
+*   **📊 Finansal Analiz:** Ciro, tahsilat ve açık hesap takibi. Borç yaşlandırma raporu ile riskli müşterileri (30, 60, 90+ gün) tespit edin.
+*   **💾 Hibrit Veri Güvenliği:** 
+    *   **Offline-First:** İnternet olmadan tam fonksiyonlu çalışır. Veriler yerel diskinizde şifreli saklanır.
+    *   **Cloud Sync:** İsteğe bağlı Google Firebase entegrasyonu ile verilerinizi buluta yedekleyin.
+*   **📄 Raporlama:** Tüm listeleri Excel veya PDF olarak dışa aktarın.
 
 ---
 
-## 🤝 Katkıda Bulunma
+## 🚀 Kurulum ve Çalıştırma
 
-1.  Bu repoyu Forklayın.
-2.  Yeni bir özellik dalı (feature branch) oluşturun (`git checkout -b feature/YeniOzellik`).
-3.  Değişikliklerinizi commit edin (`git commit -m 'Yeni özellik eklendi'`).
-4.  Dalı Pushlayın (`git push origin feature/YeniOzellik`).
-5.  Bir Pull Request oluşturun.
+Bu projeyi bilgisayarınızda çalıştırmak için aşağıdaki adımları izleyin:
+
+1.  **Projeyi İndirin:**
+    ```bash
+    git clone https://github.com/szgnemin1/osgb-fatura-takip.git
+    cd osgb-fatura-takip
+    ```
+
+2.  **Gerekli Paketleri Yükleyin:**
+    ```bash
+    npm install
+    ```
+
+3.  **Geliştirici Modunda Başlatın:**
+    Hem React arayüzünü hem de Electron penceresini aynı anda açar.
+    ```bash
+    npm run electron:dev
+    ```
+
+4.  **Kurulum Dosyası (.exe) Oluşturun:**
+    ```bash
+    npm run electron:build
+    ```
+    *Çıktı dosyası `dist/` klasöründe oluşturulacaktır.*
 
 ---
 
-## 📞 İletişim & Destek
+## 📞 Destek ve İletişim
 
-Uygulama içerisindeki **Destek** menüsünden sistem bilgilerinizi otomatik analiz ederek hata raporu gönderebilirsiniz.
+Sorularınız, önerileriniz veya hata bildirimleri için uygulama içerisindeki **Destek** sayfasını kullanabilir veya doğrudan iletişime geçebilirsiniz.
 
-**Geliştirici:** Emin Sezgin
+**Geliştirici:** Emin Sezgin  
+📧 [m.e.sezgin04@gmail.com](mailto:m.e.sezgin04@gmail.com)
+
+---
+
+<div align="center">
+  <small>© 2024 OSGB ProFinans. Tüm hakları saklıdır.</small>
+</div>

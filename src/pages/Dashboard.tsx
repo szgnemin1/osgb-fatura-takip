@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { DollarSign, FileCheck, Wallet, TrendingUp, ArrowUpRight, ArrowDownLeft, Scale } from 'lucide-react';
@@ -7,7 +8,7 @@ const Dashboard = () => {
   const [stats, setStats] = useState({ totalBilled: 0, totalCollected: 0, balance: 0, thisMonthBilled: 0, thisMonthCollected: 0 });
   const [chartData, setChartData] = useState<any[]>([]);
 
-  useEffect(() => {
+  const loadData = () => {
     // 1. Genel İstatistikler
     const s = db.getStats();
     
@@ -17,8 +18,7 @@ const Dashboard = () => {
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
 
-    // Sadece onaylı (Status=APPROVED) işlemler. 
-    // "Kesilecek Faturalar" sayfasında onay butonuna basılmış olanlar buraya düşer.
+    // Sadece onaylı (Status=APPROVED) işlemler.
     const approved = transactions.filter(t => (t.status || 'APPROVED') === 'APPROVED');
 
     const thisMonthTrans = approved.filter(t => t.month === currentMonth && t.year === currentYear);
@@ -43,25 +43,36 @@ const Dashboard = () => {
       };
     });
     setChartData(data);
+  };
+
+  useEffect(() => {
+    loadData(); // İlk yükleme
+    
+    // Canlı Veri Dinleme (Sync)
+    const unsubscribe = db.subscribe(() => {
+        loadData();
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(val);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-12">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-20 md:pb-12">
       <header>
-        <h2 className="text-3xl font-bold text-slate-100 flex items-center gap-3">
+        <h2 className="text-2xl md:text-3xl font-bold text-slate-100 flex items-center gap-3">
             <TrendingUp className="w-8 h-8 text-blue-500" />
             Ana Sayfa
         </h2>
-        <p className="text-slate-400 mt-2">Firmanızın anlık nakit akışı ve genel bakiye durumu.</p>
+        <p className="text-slate-400 mt-2 text-sm md:text-base">Firmanızın anlık nakit akışı ve genel bakiye durumu.</p>
       </header>
 
-      {/* KPI KARTLARI */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* KPI KARTLARI - MOBİLDE 1 KOLON, TABLETTE 2, PC'DE 4 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         
         {/* KART 1: TOPLAM CİRO */}
-        <div className="bg-slate-800 border border-slate-700/50 p-6 rounded-2xl shadow-xl relative overflow-hidden group hover:border-blue-500/30 transition-all">
+        <div className="bg-slate-800 border border-slate-700/50 p-5 rounded-2xl shadow-xl relative overflow-hidden group hover:border-blue-500/30 transition-all">
             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110">
                 <TrendingUp className="w-24 h-24 text-blue-400" />
             </div>
@@ -70,15 +81,15 @@ const Dashboard = () => {
                     <span className="p-2 bg-blue-500/10 rounded-lg"><TrendingUp className="w-5 h-5" /></span>
                     <h3 className="text-sm font-bold uppercase tracking-wider">Toplam Ciro</h3>
                 </div>
-                <p className="text-3xl font-bold text-white mt-4">{formatCurrency(stats.totalBilled)}</p>
-                <p className="text-xs text-slate-500 mt-2 border-t border-slate-700/50 pt-2">
-                    Sisteme kayıtlı, kesilmiş ve <b>onaylanmış</b> tüm faturaların toplam tutarı.
+                <p className="text-2xl md:text-3xl font-bold text-white mt-4">{formatCurrency(stats.totalBilled)}</p>
+                <p className="text-xs text-slate-500 mt-2 border-t border-slate-700/50 pt-2 hidden md:block">
+                    Onaylanmış tüm faturaların toplam tutarı.
                 </p>
             </div>
         </div>
 
-        {/* KART 2: BU AY ONAYLANAN FATURA */}
-        <div className="bg-slate-800 border border-slate-700/50 p-6 rounded-2xl shadow-xl relative overflow-hidden group hover:border-purple-500/30 transition-all">
+        {/* KART 2: BU AY ONAYLANAN */}
+        <div className="bg-slate-800 border border-slate-700/50 p-5 rounded-2xl shadow-xl relative overflow-hidden group hover:border-purple-500/30 transition-all">
             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110">
                 <FileCheck className="w-24 h-24 text-purple-400" />
             </div>
@@ -87,15 +98,15 @@ const Dashboard = () => {
                     <span className="p-2 bg-purple-500/10 rounded-lg"><ArrowUpRight className="w-5 h-5" /></span>
                     <h3 className="text-sm font-bold uppercase tracking-wider">Bu Ay Onaylanan</h3>
                 </div>
-                <p className="text-3xl font-bold text-white mt-4">{formatCurrency(stats.thisMonthBilled)}</p>
-                <p className="text-xs text-slate-500 mt-2 border-t border-slate-700/50 pt-2">
-                    Bu ay içinde <b>resmileşmiş (onaylanmış)</b> faturaların toplamıdır. Taslaklar dahil değildir.
+                <p className="text-2xl md:text-3xl font-bold text-white mt-4">{formatCurrency(stats.thisMonthBilled)}</p>
+                <p className="text-xs text-slate-500 mt-2 border-t border-slate-700/50 pt-2 hidden md:block">
+                    Bu ay içinde resmileşmiş faturalar.
                 </p>
             </div>
         </div>
 
-        {/* KART 3: BU AY TAHSİLAT (KASA) */}
-        <div className="bg-slate-800 border border-slate-700/50 p-6 rounded-2xl shadow-xl relative overflow-hidden group hover:border-emerald-500/30 transition-all">
+        {/* KART 3: BU AY TAHSİLAT */}
+        <div className="bg-slate-800 border border-slate-700/50 p-5 rounded-2xl shadow-xl relative overflow-hidden group hover:border-emerald-500/30 transition-all">
             <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity transform group-hover:scale-110">
                 <Wallet className="w-24 h-24 text-emerald-400" />
             </div>
@@ -104,15 +115,15 @@ const Dashboard = () => {
                     <span className="p-2 bg-emerald-500/10 rounded-lg"><ArrowDownLeft className="w-5 h-5" /></span>
                     <h3 className="text-sm font-bold uppercase tracking-wider">Bu Ay Tahsilat</h3>
                 </div>
-                <p className="text-3xl font-bold text-white mt-4">{formatCurrency(stats.thisMonthCollected)}</p>
-                <p className="text-xs text-slate-500 mt-2 border-t border-slate-700/50 pt-2">
-                    Bu ay bankaya/kasaya giren toplam nakit para girişi.
+                <p className="text-2xl md:text-3xl font-bold text-white mt-4">{formatCurrency(stats.thisMonthCollected)}</p>
+                <p className="text-xs text-slate-500 mt-2 border-t border-slate-700/50 pt-2 hidden md:block">
+                    Bu ay bankaya/kasaya giren toplam nakit.
                 </p>
             </div>
         </div>
 
-        {/* KART 4: GENEL BAKİYE (PİYASADAKİ PARA) */}
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-orange-500/30 p-6 rounded-2xl shadow-xl relative overflow-hidden group">
+        {/* KART 4: GENEL BAKİYE */}
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-orange-500/30 p-5 rounded-2xl shadow-xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity transform group-hover:scale-110">
                 <Scale className="w-24 h-24 text-orange-400" />
             </div>
@@ -121,9 +132,9 @@ const Dashboard = () => {
                     <span className="p-2 bg-orange-500/10 rounded-lg"><DollarSign className="w-5 h-5" /></span>
                     <h3 className="text-sm font-bold uppercase tracking-wider">Genel Bakiye</h3>
                 </div>
-                <p className="text-3xl font-bold text-white mt-4">{formatCurrency(stats.balance)}</p>
-                <p className="text-xs text-slate-400 mt-2 border-t border-orange-500/20 pt-2">
-                    Piyasadan toplanması gereken toplam alacak miktarı (Devirler Dahil).
+                <p className="text-2xl md:text-3xl font-bold text-white mt-4">{formatCurrency(stats.balance)}</p>
+                <p className="text-xs text-slate-400 mt-2 border-t border-orange-500/20 pt-2 hidden md:block">
+                    Piyasadan toplanması gereken toplam alacak.
                 </p>
             </div>
         </div>
@@ -133,24 +144,24 @@ const Dashboard = () => {
       {/* ALT BÖLÜM: GRAFİK VE ÖZET */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* SOL: GRAFİK */}
-          <div className="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-lg">
+          {/* SOL: GRAFİK - Mobilde yükseklik ayarı */}
+          <div className="lg:col-span-2 bg-slate-800 border border-slate-700 rounded-2xl p-4 md:p-6 shadow-lg">
             <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-bold text-slate-200">Son 6 Aylık Finansal Akış</h3>
-                <div className="flex gap-4 text-xs">
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-500"></span> Kesilen Fatura</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-emerald-500"></span> Tahsilat</span>
+                <h3 className="text-lg font-bold text-slate-200">Son 6 Ay</h3>
+                <div className="flex gap-2 md:gap-4 text-[10px] md:text-xs">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-blue-500"></span> Fatura</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-emerald-500"></span> Tahsilat</span>
                 </div>
             </div>
-            <div className="w-full h-80 min-h-[320px]">
+            <div className="w-full h-60 md:h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                  <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize: 12}} />
-                  <YAxis stroke="#94a3b8" tick={{fontSize: 12}} tickFormatter={(val) => `${val / 1000}k`} />
+                  <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize: 10}} interval={0} />
+                  <YAxis stroke="#94a3b8" tick={{fontSize: 10}} tickFormatter={(val) => `${val / 1000}k`} />
                   <Tooltip 
                     cursor={{fill: '#1e293b'}}
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', borderRadius: '8px' }}
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', borderRadius: '8px', fontSize: '12px' }}
                     itemStyle={{ color: '#f8fafc' }}
                     formatter={(value: number) => formatCurrency(value)}
                   />
@@ -163,12 +174,12 @@ const Dashboard = () => {
 
           {/* SAĞ: ÖZET BİLGİ */}
           <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-lg flex flex-col justify-center">
-              <h3 className="text-lg font-bold text-slate-200 mb-6">Finansal Sağlık Durumu</h3>
+              <h3 className="text-lg font-bold text-slate-200 mb-6">Finansal Sağlık</h3>
               
               <div className="space-y-6">
                   <div className="relative pt-1">
                       <div className="flex mb-2 items-center justify-between">
-                          <span className="text-xs font-semibold inline-block text-blue-400 uppercase">Toplam Ciro (Yıl İçi)</span>
+                          <span className="text-xs font-semibold inline-block text-blue-400 uppercase">Toplam Ciro</span>
                           <span className="text-xs font-semibold inline-block text-blue-400">{formatCurrency(stats.totalBilled)}</span>
                       </div>
                       <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-slate-700">
@@ -186,12 +197,11 @@ const Dashboard = () => {
                       </div>
                   </div>
                   
-                  <div className="mt-8 p-4 bg-slate-900 rounded-xl border border-slate-700">
+                  <div className="mt-4 md:mt-8 p-4 bg-slate-900 rounded-xl border border-slate-700 text-center">
                       <div className="text-xs text-slate-500 mb-1">Tahsilat Başarı Oranı</div>
                       <div className="text-2xl font-bold text-white">
                           %{stats.totalBilled > 0 ? ((stats.totalCollected / stats.totalBilled) * 100).toFixed(1) : '0'}
                       </div>
-                      <p className="text-[10px] text-slate-600 mt-2">Kesilen her 100 TL'lik faturanın ne kadarının tahsil edildiğini gösterir.</p>
                   </div>
               </div>
           </div>

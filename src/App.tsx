@@ -9,107 +9,101 @@ import Invoices from './pages/Invoices';
 import FirmDetails from './pages/FirmDetails';
 import Settings from './pages/Settings';
 import DebtTracking from './pages/DebtTracking';
-import Support from './pages/Support'; // Yeni sayfa eklendi
+import Support from './pages/Support';
 import { db } from './services/db';
-import { DownloadCloud, RefreshCw, X } from 'lucide-react';
+import { Loader2, Menu, RefreshCw, AlertCircle } from 'lucide-react';
 
 const App = () => {
-  // Update State
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'available' | 'downloaded'>('idle');
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Uygulama başlarken Masaüstü Veritabanını (database.json) hafızaya yükle
-  useEffect(() => {
-    db.initFileSystem();
-
-    // Electron IPC Dinleyicileri (Güncelleme için)
-    if (typeof window !== 'undefined' && (window as any).require) {
-        try {
-            const { ipcRenderer } = (window as any).require('electron');
-            
-            ipcRenderer.on('update_available', () => {
-                setUpdateStatus('available');
-            });
-
-            ipcRenderer.on('update_downloaded', () => {
-                setUpdateStatus('downloaded');
-            });
-        } catch (e) {
-            console.error("Electron IPC hatası:", e);
-        }
-    }
-  }, []);
-
-  const restartApp = () => {
-      if (typeof window !== 'undefined' && (window as any).require) {
-          const { ipcRenderer } = (window as any).require('electron');
-          ipcRenderer.send('restart_app');
+  const initApp = async () => {
+      setIsInitializing(true);
+      setError(null);
+      try {
+          await db.initData();
+          setIsInitializing(false);
+      } catch (e: any) {
+          console.error(e);
+          setError(e.message || "Veritabanına bağlanılamadı.");
+          setIsInitializing(false);
       }
   };
 
-  const closeNotification = () => {
-      setUpdateStatus('idle');
-  };
+  useEffect(() => {
+    initApp();
+  }, []);
+
+  if (isInitializing) {
+      return (
+          <div className="h-screen w-screen bg-slate-950 flex flex-col items-center justify-center text-slate-300 gap-4">
+              <Loader2 className="w-12 h-12 animate-spin text-blue-500" />
+              <p className="animate-pulse">Veriler Yükleniyor...</p>
+          </div>
+      );
+  }
+
+  if (error) {
+      return (
+          <div className="h-screen w-screen bg-slate-950 flex flex-col items-center justify-center text-slate-300 gap-6 p-6 text-center">
+              <div className="bg-rose-500/10 p-4 rounded-full">
+                  <AlertCircle className="w-12 h-12 text-rose-500" />
+              </div>
+              <div>
+                  <h2 className="text-xl font-bold text-white">Bağlantı Hatası</h2>
+                  <p className="text-slate-400 mt-2 max-w-md">{error}</p>
+                  <p className="text-xs text-slate-600 mt-2">Bilgisayarınızın açık ve uygulamanın çalıştığından emin olun.</p>
+              </div>
+              <button 
+                onClick={initApp}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-all"
+              >
+                  <RefreshCw className="w-4 h-4" />
+                  Tekrar Dene
+              </button>
+          </div>
+      );
+  }
 
   return (
     <Router>
-      <div className="flex h-screen bg-slate-950 text-slate-200 font-sans relative">
-        <Sidebar />
-        <main className="flex-1 overflow-auto p-8 relative">
-          <div className="max-w-7xl mx-auto h-full">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/firms" element={<FirmRegistration />} />
-              <Route path="/prepare" element={<Preparation />} />
-              <Route path="/invoices" element={<Invoices />} />
-              <Route path="/details" element={<FirmDetails />} />
-              <Route path="/debt-tracking" element={<DebtTracking />} />
-              <Route path="/support" element={<Support />} /> {/* Yeni rota */}
-              <Route path="/settings" element={<Settings />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+      <div className="flex h-screen bg-slate-950 text-slate-200 font-sans relative overflow-hidden">
+        
+        {/* Sidebar */}
+        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col h-full relative w-full transition-all duration-300">
+          
+          {/* Mobil Header */}
+          <div className="md:hidden bg-slate-900 border-b border-slate-800 p-4 flex items-center justify-between sticky top-0 z-30">
+             <div className="flex items-center gap-3">
+                <button onClick={() => setIsSidebarOpen(true)} className="text-slate-300 hover:text-white">
+                  <Menu className="w-6 h-6" />
+                </button>
+                <span className="font-bold text-white tracking-wider flex items-center gap-2">
+                   <span className="text-blue-500">OSGB</span> PRO
+                </span>
+             </div>
+          </div>
+
+          <div className="flex-1 overflow-auto p-4 md:p-8">
+            <div className="max-w-7xl mx-auto h-full pb-20 md:pb-0">
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/firms" element={<FirmRegistration />} />
+                <Route path="/prepare" element={<Preparation />} />
+                <Route path="/invoices" element={<Invoices />} />
+                <Route path="/details" element={<FirmDetails />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/debt-tracking" element={<DebtTracking />} />
+                <Route path="/support" element={<Support />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </div>
           </div>
         </main>
-
-        {/* GÜNCELLEME BİLDİRİMİ (TOAST) */}
-        {updateStatus !== 'idle' && (
-            <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 fade-in duration-500">
-                <div className="bg-slate-800 border border-slate-700 shadow-2xl rounded-xl p-4 w-80 flex flex-col gap-3 relative overflow-hidden">
-                    {/* Arka Plan Efekti */}
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-                    
-                    <button onClick={closeNotification} className="absolute top-2 right-2 text-slate-500 hover:text-white">
-                        <X className="w-4 h-4" />
-                    </button>
-
-                    <div className="flex items-start gap-3 mt-1">
-                        <div className={`p-2 rounded-lg ${updateStatus === 'available' ? 'bg-blue-500/10 text-blue-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                            {updateStatus === 'available' ? <DownloadCloud className="w-6 h-6 animate-pulse" /> : <RefreshCw className="w-6 h-6" />}
-                        </div>
-                        <div>
-                            <h4 className="font-bold text-white text-sm">
-                                {updateStatus === 'available' ? 'Yeni Sürüm İndiriliyor...' : 'Güncelleme Hazır!'}
-                            </h4>
-                            <p className="text-xs text-slate-400 mt-1">
-                                {updateStatus === 'available' 
-                                    ? 'Uygulamanın yeni sürümü bulundu ve arka planda indiriliyor. Lütfen bekleyin.' 
-                                    : 'Yüklemek ve yeni özellikleri kullanmak için uygulamayı yeniden başlatın.'}
-                            </p>
-                        </div>
-                    </div>
-
-                    {updateStatus === 'downloaded' && (
-                        <button 
-                            onClick={restartApp}
-                            className="mt-1 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                        >
-                            <RefreshCw className="w-4 h-4" />
-                            Şimdi Yeniden Başlat
-                        </button>
-                    )}
-                </div>
-            </div>
-        )}
-
       </div>
     </Router>
   );

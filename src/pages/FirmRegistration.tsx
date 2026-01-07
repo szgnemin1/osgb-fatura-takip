@@ -11,6 +11,8 @@ const FirmRegistration = () => {
     basePersonLimit: 10,
     baseFee: 1000,
     extraPersonFee: 50,
+    expertPercentage: 60,
+    doctorPercentage: 40,
     defaultInvoiceType: InvoiceType.E_FATURA,
     taxNumber: '',
     address: '',
