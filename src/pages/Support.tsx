@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Mail, Github, Linkedin, MessageSquare, Info, Cpu, Monitor, HardDrive, Send, ExternalLink, Instagram, CheckCircle } from 'lucide-react';
 
@@ -11,7 +12,7 @@ const Support = () => {
     os: 'Yükleniyor...',
     cpu: 'Yükleniyor...',
     gpu: 'Yükleniyor...',
-    appVersion: '2.0.0',
+    appVersion: '2.1.0',
     platform: 'Web Browser',
     arch: '',
     ram: ''
@@ -38,7 +39,7 @@ const Support = () => {
           os: `${proc.platform} (Sürüm: ${proc.getSystemVersion()})`,
           cpu: `${navigator.hardwareConcurrency} Çekirdek - Mimari: ${proc.arch}`,
           gpu: gpu,
-          appVersion: '2.0.0',
+          appVersion: '2.1.0',
           platform: 'Windows Masaüstü Uygulaması (EXE)',
           arch: proc.arch,
           ram: (navigator as any).deviceMemory ? `${(navigator as any).deviceMemory} GB` : 'Bilinmiyor'

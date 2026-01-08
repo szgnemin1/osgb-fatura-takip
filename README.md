@@ -1,9 +1,10 @@
 
+
 <div align="center">
   
   <img src="public/logo.svg" alt="OSGB Pro Logo" width="120" height="120" />
 
-  # 🏥 OSGB ProFinans
+  # 🏥 OSGB ProFinans v2.1.0
 
   **OSGB ve Hizmet Sektörü İçin Akıllı Finans & Hakediş Yönetimi**
   
@@ -13,7 +14,7 @@
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/v2.0.0-Stable-emerald?style=flat-square" alt="Version">
+    <img src="https://img.shields.io/badge/v2.1.0-Stable-emerald?style=flat-square" alt="Version">
     <img src="https://img.shields.io/badge/React-v18-blue?style=flat-square&logo=react" alt="React">
     <img src="https://img.shields.io/badge/Electron-Desktop-purple?style=flat-square&logo=electron" alt="Electron">
     <img src="https://img.shields.io/badge/License-MIT-gray?style=flat-square" alt="License">
@@ -23,15 +24,16 @@
 
 ---
 
+## 🚀 Yeni Özellikler (v2.1.0)
+*   **Otomatik Firewall Ayarı:** Kurulum sırasında Windows Güvenlik Duvarı'nda 5000. port otomatik olarak açılır. Artık manuel ayar yapmanıza gerek yok.
+*   **Mobil Bağlantı:** Aynı Wi-Fi ağındaki telefonlarınızdan, ana bilgisayarın IP adresini girerek sisteme erişebilirsiniz.
+*   **Gelişmiş Yedekleme:** Veri yapısı ve yedekleme sistemi optimize edildi.
+
+---
+
 ## 👁️ Önizleme ve Galeri
 
 Proje, kullanıcı dostu **Dark Mode** arayüzü ile tasarlanmıştır.
-
-### 🎥 Tanıtım Videosu
-<!-- Buraya uygulamanın çalıştığını gösteren bir GIF veya YouTube linki ekleyin -->
-<div align="center">
-  <img src="https://via.placeholder.com/800x450/1e293b/FFFFFF?text=Uygulama+Tanıtım+Videosu+(Buraya+GIF+Gelecek)" alt="Demo Video" width="100%" />
-</div>
 
 ### 📸 Ekran Görüntüleri
 

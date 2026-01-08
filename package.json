@@ -1,7 +1,6 @@
-
 {
   "name": "osgb-fatura-takip",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "homepage": "./",
   "main": "public/electron.js",
@@ -83,7 +82,14 @@
       "buildResources": "assets"
     },
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "public/favicon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "include": "scripts/installer.nsh"
     }
   }
 }

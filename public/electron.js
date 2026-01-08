@@ -7,6 +7,9 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const { autoUpdater } = require('electron-updater');
 
+// Pencere referansını global tutuyoruz ki API içinden erişebilelim
+let mainWindow;
+
 // --- SERVER AYARLARI (Telefondan Erişim İçin) ---
 const SERVER_PORT = 5000;
 const serverApp = express();
@@ -35,7 +38,6 @@ serverApp.use(cors());
 serverApp.use(bodyParser.json({ limit: '50mb' }));
 
 // 1. Statik Dosyaları Sun
-// Üretim modunda __dirname zaten 'build' klasörüdür. Geliştirme modunda '../build' gerekir.
 const buildPath = app.isPackaged 
     ? path.join(__dirname) 
     : path.join(__dirname, '../build');
@@ -58,13 +60,21 @@ serverApp.get('/api/db', (req, res) => {
   }
 });
 
-// 3. API: Veritabanını Güncelle (POST)
+// 3. API: Veritabanını Güncelle (POST) - KRİTİK GÜNCELLEME
 serverApp.post('/api/db', (req, res) => {
   try {
     const data = req.body;
+    // 1. Dosyaya Yaz
     fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+    
+    // 2. Masaüstü Uygulamasına Haber Ver (Canlı Senkronizasyon)
+    if (mainWindow) {
+        mainWindow.webContents.send('external-data-update');
+    }
+
     res.json({ success: true });
   } catch (e) {
+    console.error(e);
     res.status(500).json({ error: 'Veritabanı yazılamadı' });
   }
 });
@@ -92,13 +102,12 @@ const startServer = () => {
 // --------------------------------------------------
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 850,
     minWidth: 800,
     minHeight: 600,
     title: "OSGB Fatura Takip",
-    // İkon hem dev hem prod modunda yanındadır
     icon: path.join(__dirname, 'favicon.ico'),
     webPreferences: {
       nodeIntegration: true,
@@ -109,14 +118,11 @@ function createWindow() {
     frame: true
   });
 
-  // KRİTİK PATH DÜZELTMESİ:
-  // Packaged (EXE) ise: index.html electron.js ile aynı klasördedir.
-  // Dev ise: index.html bir üst klasördeki build içindedir.
   const startUrl = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, app.isPackaged ? 'index.html' : '../build/index.html')}`;
   
-  win.loadURL(startUrl);
+  mainWindow.loadURL(startUrl);
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https:') || url.startsWith('http:')) {
       shell.openExternal(url);
       return { action: 'deny' };
@@ -124,12 +130,16 @@ function createWindow() {
     return { action: 'allow' };
   });
 
-  win.once('ready-to-show', () => {
+  mainWindow.once('ready-to-show', () => {
     if (app.isPackaged) autoUpdater.checkForUpdatesAndNotify();
   });
 
-  autoUpdater.on('update-available', () => win.webContents.send('update_available'));
-  autoUpdater.on('update-downloaded', () => win.webContents.send('update_downloaded'));
+  mainWindow.on('closed', () => {
+      mainWindow = null;
+  });
+
+  autoUpdater.on('update-available', () => mainWindow.webContents.send('update_available'));
+  autoUpdater.on('update-downloaded', () => mainWindow.webContents.send('update_downloaded'));
 }
 
 ipcMain.on('get-db-path', (event) => {

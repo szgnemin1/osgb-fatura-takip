@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Building2, Calculator, Receipt, FileText, Settings, TrendingDown, LifeBuoy, X } from 'lucide-react';
@@ -84,7 +85,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
         </nav>
 
         <div className="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
-          v2.0.0 • Mobil Uyumlu
+          v2.1.0 • Mobil Uyumlu
         </div>
       </div>
     </>
