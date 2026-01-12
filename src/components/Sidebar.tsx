@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Building2, Calculator, Receipt, FileText, Settings, TrendingDown, LifeBuoy, X } from 'lucide-react';

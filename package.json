@@ -1,10 +1,11 @@
+
 {
   "name": "osgb-fatura-takip",
   "version": "2.1.0",
   "private": true,
   "homepage": "./",
   "main": "public/electron.js",
-  "description": "OSGB ve Hizmet Sektörü İçin Akıllı Hakediş ve Finans Yönetim Sistemi",
+  "description": "OSGB ve Hizmet Sektörü İçin Hibrit (Masaüstü + Mobil) Finans ve Hakediş Yönetim Sistemi",
   "author": {
     "name": "Emin Sezgin",
     "email": "m.e.sezgin04@gmail.com"
@@ -42,7 +43,7 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && electron .\"",
+    "electron:dev": "concurrently \"cross-env BROWSER=none npm start\" \"wait-on http://localhost:3000 && cross-env ELECTRON_START_URL=http://localhost:3000 electron .\"",
     "electron:build": "npm run build && electron-builder -c.extraMetadata.main=build/electron.js"
   },
   "eslintConfig": {

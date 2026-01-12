@@ -1,131 +1,37 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Firm, Transaction, TransactionType } from '../types';
-import { Search, PlusCircle, ArrowDownLeft, ArrowUpRight, ArrowLeft, Filter, Phone, Share2, Wallet, FileText, ChevronRight } from 'lucide-react';
-
-// --- YARDIMCI KOMPONENTLER ---
-
-// Para Formatı
-const formatCurrency = (val: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 2 }).format(val);
-const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-
-// Firma Kartı (Liste Görünümü)
-interface FirmCardProps {
-  firm: Firm;
-  balance: number;
-  onClick: () => void;
-}
-
-const FirmCard: React.FC<FirmCardProps> = ({ firm, balance, onClick }) => (
-  <div onClick={onClick} className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm active:scale-[0.98] transition-all mb-3 flex justify-between items-center cursor-pointer group">
-    <div>
-      <h3 className="font-bold text-slate-100 text-base">{firm.name}</h3>
-      {firm.parentFirmId && <span className="text-[10px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded">Şube</span>}
-    </div>
-    <div className="text-right">
-      <div className={`text-lg font-bold ${balance > 0 ? 'text-rose-500' : (balance < 0 ? 'text-emerald-500' : 'text-slate-500')}`}>
-        {formatCurrency(balance)}
-      </div>
-      <div className="text-[10px] text-slate-500 flex items-center justify-end gap-1 group-hover:text-blue-400">
-        Detay <ChevronRight className="w-3 h-3" />
-      </div>
-    </div>
-  </div>
-);
-
-// İşlem Kartı (Detay Görünümü)
-interface TransactionCardProps {
-  transaction: Transaction;
-}
-
-const TransactionCard: React.FC<TransactionCardProps> = ({ transaction }) => {
-  const isInvoice = transaction.type === TransactionType.INVOICE;
-  return (
-    <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50 mb-2 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-full ${isInvoice ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-          {isInvoice ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownLeft className="w-5 h-5" />}
-        </div>
-        <div>
-          <div className="text-sm font-medium text-slate-200">{transaction.description}</div>
-          <div className="text-xs text-slate-500">{formatDate(transaction.date)}</div>
-        </div>
-      </div>
-      <div className={`font-bold ${isInvoice ? 'text-rose-400' : 'text-emerald-400'}`}>
-        {isInvoice ? formatCurrency(transaction.debt) : formatCurrency(transaction.credit)}
-      </div>
-    </div>
-  );
-};
+import { exporter } from '../services/exporter';
+import { FileText, Search, PlusCircle, ArrowDownLeft, ArrowUpRight, Building2, Download, Table, ArrowLeft, Wallet, ChevronRight } from 'lucide-react';
 
 const FirmDetails = () => {
-  // --- STATE ---
   const [firms, setFirms] = useState<Firm[]>([]);
+  const [selectedFirmId, setSelectedFirmId] = useState<string>('');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Seçili Firma (Mobil için sayfa geçişi gibi çalışır)
-  const [selectedFirmId, setSelectedFirmId] = useState<string | null>(null);
-
-  // Modal State (Tahsilat)
+  // Payment Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
 
-  // Veri Yükleme
-  const loadData = () => {
-    setFirms(db.getFirms());
-    setTransactions(db.getTransactions());
-  };
-
   useEffect(() => {
-    loadData();
-    // Veritabanı dinleyicisi
-    const unsubscribe = db.subscribe(loadData);
-    return () => unsubscribe();
+    setFirms(db.getFirms());
   }, []);
 
-  // --- HESAPLAMALAR ---
-  
-  // Her firmanın bakiyesini önceden hesapla (Liste performansı için)
-  const firmBalances = useMemo(() => {
-    const balances: Record<string, number> = {};
-    firms.forEach(f => {
-       // Ana firma + şubeleri bul
-       const relatedIds = [f.id, ...firms.filter(sub => sub.parentFirmId === f.id).map(sub => sub.id)];
-       
-       const firmTrans = transactions.filter(t => relatedIds.includes(t.firmId) && (t.status === 'APPROVED' || !t.status));
-       const debt = firmTrans.reduce((sum, t) => sum + t.debt, 0);
-       const credit = firmTrans.reduce((sum, t) => sum + t.credit, 0);
-       balances[f.id] = debt - credit;
-    });
-    return balances;
-  }, [firms, transactions]);
+  useEffect(() => {
+    if (selectedFirmId) {
+      const all = db.getTransactions();
+      const filtered = all
+        .filter(t => t.firmId === selectedFirmId && (t.status === 'APPROVED' || t.status === undefined)) // Sadece onaylıları göster
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      setTransactions(filtered);
+    } else {
+      setTransactions([]);
+    }
+  }, [selectedFirmId, isPaymentModalOpen]);
 
-  // Filtrelenmiş ve Sıralanmış Firmalar (Borçlular en üstte)
-  const sortedFirms = useMemo(() => {
-    let list = firms.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    // Sadece ana firmaları veya şubesi olmayanları ana listede göster (Opsiyonel, şimdilik hepsini gösterelim ama sıralayalım)
-    return list.sort((a, b) => (firmBalances[b.id] || 0) - (firmBalances[a.id] || 0));
-  }, [firms, searchTerm, firmBalances]);
-
-  // Seçili Firmanın Detayları
-  const activeFirmData = useMemo(() => {
-    if (!selectedFirmId) return null;
-    const firm = firms.find(f => f.id === selectedFirmId);
-    if (!firm) return null;
-
-    // İşlemler (Tarihe göre yeni -> eski)
-    const history = transactions
-        .filter(t => t.firmId === selectedFirmId && (t.status === 'APPROVED' || !t.status))
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-    return { firm, history, balance: firmBalances[selectedFirmId] };
-  }, [selectedFirmId, firms, transactions, firmBalances]);
-
-
-  // --- İŞLEMLER ---
+  const filteredFirms = firms.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const handleAddPayment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,7 +41,7 @@ const FirmDetails = () => {
       firmId: selectedFirmId,
       date: new Date().toISOString(),
       type: TransactionType.PAYMENT,
-      description: 'Mobil Tahsilat',
+      description: 'Tahsilat',
       debt: 0,
       credit: Number(paymentAmount),
       month: new Date().getMonth() + 1,
@@ -147,149 +53,261 @@ const FirmDetails = () => {
     setPaymentAmount('');
   };
 
-  const handleShareWhatsapp = () => {
-    if (!activeFirmData) return;
-    const { firm, balance } = activeFirmData;
-    const text = `Sayın ${firm.name} yetkilisi,\n\n${new Date().toLocaleDateString('tr-TR')} tarihi itibariyle güncel bakiyeniz: ${formatCurrency(balance)}'dir.\n\nİyi çalışmalar dileriz.`;
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+  const exportSingleFirm = () => {
+    const firm = firms.find(f => f.id === selectedFirmId);
+    if (!firm) return;
+
+    const data = transactions.map(t => ({
+      'Ay/Yıl': `${new Date(0, t.month - 1).toLocaleString('tr-TR', { month: 'long' })} ${t.year}`,
+      'Tarih': new Date(t.date).toLocaleDateString('tr-TR'),
+      'Açıklama': t.description,
+      'Borç': t.debt,
+      'Alacak': t.credit
+    }));
+
+    exporter.exportToExcel(`${firm.name}_Ekstre`, data);
   };
 
-  // --- RENDER ---
+  const exportBulkBalances = () => {
+    const allTrans = db.getTransactions();
+    const data = firms.map(firm => {
+      const firmTrans = allTrans.filter(t => t.firmId === firm.id && (t.status === 'APPROVED' || !t.status));
+      const billed = firmTrans.reduce((sum, t) => sum + t.debt, 0);
+      const paid = firmTrans.reduce((sum, t) => sum + t.credit, 0);
+      const bal = billed - paid;
 
-  // GÖRÜNÜM 1: LİSTE (Ana Ekran)
-  if (!selectedFirmId) {
-    return (
-      <div className="max-w-3xl mx-auto pb-20 animate-in fade-in duration-300">
-        {/* Header */}
-        <div className="sticky top-0 bg-slate-950/80 backdrop-blur-md z-20 pb-4 pt-2">
-            <h2 className="text-2xl font-bold text-white mb-4 px-1">Cari Hesaplar</h2>
-            <div className="relative">
-                <Search className="absolute left-3 top-3.5 w-5 h-5 text-slate-500" />
-                <input 
-                    type="text" 
-                    placeholder="Firma ara..." 
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-500 focus:border-blue-500 outline-none text-lg shadow-lg"
-                />
-            </div>
+      return {
+        'Firma Adı': firm.name,
+        'Toplam Faturalanan': billed,
+        'Toplam Tahsilat': paid,
+        'Kalan Bakiye': bal,
+        'Durum': bal > 0 ? 'Borçlu' : 'Alacaklı/Kapalı'
+      };
+    });
+
+    exporter.exportToExcel('Tum_Firmalar_Bakiye_Raporu', data);
+  };
+
+  const totalBilled = transactions.reduce((sum, t) => sum + t.debt, 0);
+  const totalPaid = transactions.reduce((sum, t) => sum + t.credit, 0);
+  const balance = totalBilled - totalPaid;
+
+  const formatCurrency = (val: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
+  const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString('tr-TR');
+
+  return (
+    <div className="h-[calc(100vh-2rem)] flex flex-col space-y-4 animate-in fade-in duration-500">
+      
+      {/* HEADER (Mobilde Gizlenir, Detayda Geri Tuşu Gelir) */}
+      <header className={`flex justify-between items-start ${selectedFirmId ? 'hidden md:flex' : 'flex'}`}>
+        <div>
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-100 flex items-center gap-3">
+            <FileText className="w-8 h-8 text-purple-500" />
+            Cari Detay (Ekstre)
+          </h2>
+          <p className="text-slate-400 mt-2 text-sm">Firma bazlı kesinleşmiş hareketler ve bakiye durumu.</p>
         </div>
+        <button 
+          onClick={exportBulkBalances}
+          className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm transition-colors border border-slate-600"
+        >
+          <Table className="w-4 h-4" />
+          <span className="hidden md:inline">Tüm Bakiye Raporu</span>
+        </button>
+      </header>
 
-        {/* Liste */}
-        <div className="space-y-1">
-            {sortedFirms.length > 0 ? (
-                sortedFirms.map(firm => (
-                    <FirmCard 
-                        key={firm.id} 
-                        firm={firm} 
-                        balance={firmBalances[firm.id] || 0} 
-                        onClick={() => setSelectedFirmId(firm.id)} 
-                    />
-                ))
-            ) : (
-                <div className="text-center py-10 text-slate-500">
-                    <p>Firma bulunamadı.</p>
-                </div>
-            )}
-        </div>
-      </div>
-    );
-  }
-
-  // GÖRÜNÜM 2: DETAY (Seçili Firma)
-  if (activeFirmData) {
-    const { firm, history, balance } = activeFirmData;
-    
-    return (
-      <div className="fixed inset-0 bg-slate-950 z-50 flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="flex flex-col md:grid md:grid-cols-12 gap-6 flex-1 min-h-0 relative">
         
-        {/* Top Bar */}
-        <div className="bg-slate-900 p-4 flex items-center gap-4 border-b border-slate-800 shadow-md shrink-0">
-            <button onClick={() => setSelectedFirmId(null)} className="p-2 -ml-2 text-slate-300 hover:text-white active:bg-slate-800 rounded-full">
-                <ArrowLeft className="w-6 h-6" />
-            </button>
-            <div className="flex-1 overflow-hidden">
-                <h2 className="text-lg font-bold text-white truncate">{firm.name}</h2>
-                <p className="text-xs text-slate-400">Hesap Detayı</p>
+        {/* SOL LİSTE (SIDEBAR) */}
+        <div className={`md:col-span-3 bg-slate-800 border border-slate-700 rounded-xl flex flex-col overflow-hidden ${selectedFirmId ? 'hidden md:flex' : 'flex h-full'}`}>
+          <div className="p-4 border-b border-slate-700 bg-slate-800 sticky top-0 z-10">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-500" />
+              <input 
+                type="text" 
+                placeholder="Firma Ara..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 outline-none focus:border-blue-500"
+              />
             </div>
+          </div>
+          <div className="overflow-y-auto flex-1 p-2 space-y-1">
+            {filteredFirms.map(firm => (
+              <button
+                key={firm.id}
+                onClick={() => setSelectedFirmId(firm.id)}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-colors flex justify-between items-center ${
+                  selectedFirmId === firm.id 
+                    ? 'bg-blue-600 text-white shadow-lg' 
+                    : 'text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                <span className="truncate">{firm.name}</span>
+                <ChevronRight className="w-4 h-4 opacity-50" />
+              </button>
+            ))}
+            {filteredFirms.length === 0 && <div className="p-4 text-center text-slate-500 text-sm">Firma bulunamadı.</div>}
+          </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 pb-24">
-            
-            {/* Büyük Bakiye Kartı */}
-            <div className={`p-6 rounded-2xl mb-6 text-center shadow-lg border border-white/5 ${balance > 0 ? 'bg-gradient-to-br from-rose-900 to-slate-900' : 'bg-gradient-to-br from-emerald-900 to-slate-900'}`}>
-                <div className="text-slate-300 text-sm font-medium mb-1 uppercase tracking-widest">Güncel Bakiye</div>
-                <div className="text-4xl font-bold text-white tracking-tight">{formatCurrency(balance)}</div>
-                <div className="mt-2 text-xs text-white/50">{balance > 0 ? 'Tahsil edilecek tutar' : 'Alacaklı / Ödendi'}</div>
-            </div>
-
-            {/* Hızlı İşlemler */}
-            <div className="grid grid-cols-2 gap-3 mb-6">
-                <button onClick={() => setIsPaymentModalOpen(true)} className="bg-emerald-600 active:bg-emerald-700 text-white p-3 rounded-xl flex items-center justify-center gap-2 font-semibold shadow-lg transition-transform active:scale-95">
-                    <PlusCircle className="w-5 h-5" /> Tahsilat Ekle
-                </button>
-                <button onClick={handleShareWhatsapp} className="bg-slate-800 active:bg-slate-700 border border-slate-700 text-slate-200 p-3 rounded-xl flex items-center justify-center gap-2 font-semibold shadow-lg transition-transform active:scale-95">
-                    <Share2 className="w-5 h-5 text-green-500" /> Paylaş
-                </button>
-            </div>
-
-            {/* Geçmiş Listesi */}
-            <div>
-                <h3 className="text-slate-400 text-sm font-bold uppercase mb-3 flex items-center gap-2">
-                    <FileText className="w-4 h-4" /> İşlem Geçmişi
-                </h3>
-                {history.length > 0 ? (
-                    history.map(t => <TransactionCard key={t.id} transaction={t} />)
-                ) : (
-                    <div className="text-center py-8 text-slate-600 bg-slate-900/50 rounded-xl border border-slate-800 border-dashed">
-                        Henüz işlem yok.
-                    </div>
-                )}
-            </div>
-        </div>
-
-        {/* Modal: Tahsilat Ekle */}
-        {isPaymentModalOpen && (
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 animate-in fade-in">
-                <div className="bg-slate-800 w-full max-w-sm rounded-2xl border border-slate-700 shadow-2xl overflow-hidden animate-in slide-in-from-bottom">
-                    <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
-                        <h3 className="font-bold text-white">Hızlı Tahsilat</h3>
-                        <button onClick={() => setIsPaymentModalOpen(false)} className="text-slate-400 hover:text-white">Kapat</button>
-                    </div>
-                    <form onSubmit={handleAddPayment} className="p-6 space-y-4">
-                        <div className="text-center mb-2">
-                            <span className="text-sm text-slate-400 block mb-1">Firma</span>
-                            <span className="font-bold text-white">{firm.name}</span>
-                        </div>
-                        <div>
-                            <label className="block text-xs text-slate-400 mb-2 uppercase font-bold">Tutar Giriniz</label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-3.5 text-slate-400 font-bold text-xl">₺</span>
-                                <input 
-                                    autoFocus
-                                    type="number" 
-                                    value={paymentAmount}
-                                    onChange={e => setPaymentAmount(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-600 rounded-xl pl-10 pr-4 py-3 text-2xl font-bold text-white focus:border-emerald-500 outline-none text-right"
-                                    placeholder="0"
-                                />
-                            </div>
-                        </div>
-                        <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-4 rounded-xl font-bold text-lg shadow-lg mt-2">
-                            Onayla
-                        </button>
-                    </form>
+        {/* SAĞ DETAY (TABLE VIEW) */}
+        <div className={`md:col-span-9 bg-slate-800 border border-slate-700 rounded-xl flex flex-col overflow-hidden relative h-full ${selectedFirmId ? 'flex' : 'hidden md:flex'}`}>
+          {selectedFirmId ? (
+            <>
+              {/* Toolbar */}
+              <div className="p-3 md:p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/95 backdrop-blur z-20 sticky top-0">
+                <div className="flex items-center gap-3 overflow-hidden">
+                  {/* Mobil Geri Tuşu */}
+                  <button onClick={() => setSelectedFirmId('')} className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white">
+                    <ArrowLeft className="w-6 h-6" />
+                  </button>
+                  
+                  <div className="flex flex-col">
+                      <h3 className="text-base md:text-lg font-bold text-white truncate max-w-[200px] md:max-w-none">
+                        {firms.find(f => f.id === selectedFirmId)?.name}
+                      </h3>
+                      <span className="text-[10px] text-slate-400 md:hidden">Hesap Hareketleri</span>
+                  </div>
+                  
+                  <button 
+                    onClick={exportSingleFirm}
+                    className="hidden md:block p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-md transition-colors"
+                    title="Excel Olarak İndir"
+                  >
+                    <Download className="w-5 h-5" />
+                  </button>
                 </div>
+                <button 
+                  onClick={() => setIsPaymentModalOpen(true)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 transition-colors shadow-lg"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span className="hidden md:inline">Tahsilat Ekle</span>
+                  <span className="md:hidden">Tahsilat</span>
+                </button>
+              </div>
+
+              {/* Table Container */}
+              <div className="flex-1 overflow-auto bg-slate-900/30">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-slate-900 z-10 shadow-sm">
+                    <tr>
+                      <th className="p-3 md:p-4 text-slate-400 font-medium text-xs uppercase tracking-wider whitespace-nowrap">Tarih</th>
+                      <th className="p-3 md:p-4 text-slate-400 font-medium text-xs uppercase tracking-wider w-1/2">Açıklama</th>
+                      <th className="p-3 md:p-4 text-slate-400 font-medium text-xs uppercase tracking-wider text-right whitespace-nowrap">Borç</th>
+                      <th className="p-3 md:p-4 text-slate-400 font-medium text-xs uppercase tracking-wider text-right whitespace-nowrap">Alacak</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/50">
+                    {transactions.map(t => (
+                      <tr key={t.id} className="hover:bg-slate-700/30 transition-colors group">
+                        <td className="p-3 md:p-4 text-slate-300 text-xs md:text-sm whitespace-nowrap font-mono">
+                          {formatDate(t.date)}
+                        </td>
+                        <td className="p-3 md:p-4 text-slate-300 text-xs md:text-sm">
+                           <div className="flex items-center gap-2">
+                               {t.type === TransactionType.INVOICE ? <ArrowUpRight className="w-3 h-3 text-rose-500 shrink-0"/> : <ArrowDownLeft className="w-3 h-3 text-emerald-500 shrink-0"/>}
+                               <span className="line-clamp-2">{t.description}</span>
+                           </div>
+                        </td>
+                        <td className="p-3 md:p-4 text-right text-rose-400 font-medium text-xs md:text-sm whitespace-nowrap bg-rose-500/0 group-hover:bg-rose-500/5 transition-colors">
+                          {t.debt > 0 ? formatCurrency(t.debt) : '-'}
+                        </td>
+                        <td className="p-3 md:p-4 text-right text-emerald-400 font-medium text-xs md:text-sm whitespace-nowrap bg-emerald-500/0 group-hover:bg-emerald-500/5 transition-colors">
+                          {t.credit > 0 ? formatCurrency(t.credit) : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                    {transactions.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-12 text-center text-slate-500 flex flex-col items-center justify-center">
+                          <Wallet className="w-12 h-12 mb-2 opacity-20" />
+                          Bu firmaya ait kayıtlı hareket bulunamadı.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Footer Summary */}
+              <div className="p-4 bg-slate-900 border-t border-slate-700 grid grid-cols-2 md:grid-cols-3 gap-4 sticky bottom-0 z-20 shadow-[0_-5px_15px_rgba(0,0,0,0.3)]">
+                <div className="hidden md:block">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold">Toplam Kesilen</div>
+                  <div className="text-lg font-bold text-rose-500">{formatCurrency(totalBilled)}</div>
+                </div>
+                <div className="hidden md:block">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold">Toplam Tahsilat</div>
+                  <div className="text-lg font-bold text-emerald-500">{formatCurrency(totalPaid)}</div>
+                </div>
+                <div className="col-span-2 md:col-span-1 bg-slate-800 md:bg-transparent p-2 md:p-0 rounded-lg border border-slate-700 md:border-0 flex justify-between md:block items-center">
+                  <div className="text-[10px] text-slate-400 uppercase font-bold md:mb-0">Güncel Bakiye</div>
+                  <div className={`text-xl md:text-2xl font-bold ${balance > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                    {formatCurrency(balance)}
+                  </div>
+                </div>
+              </div>
+
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-slate-500 p-6 text-center">
+              <div className="bg-slate-700/30 p-6 rounded-full mb-4 animate-pulse">
+                  <Building2 className="w-16 h-16 opacity-50 text-blue-400" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-300">Firma Seçimi Yapın</h3>
+              <p className="text-sm max-w-xs mt-2">Detaylarını ve hesap hareketlerini görmek istediğiniz firmayı soldaki listeden seçiniz.</p>
             </div>
-        )}
-
+          )}
+        </div>
       </div>
-    );
-  }
 
-  return null;
+      {/* Payment Modal */}
+      {isPaymentModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-200 relative">
+            <button onClick={() => setIsPaymentModalOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white"><ArrowLeft className="w-5 h-5 rotate-180" /></button>
+            <h3 className="text-xl font-bold text-white mb-1">Tahsilat Ekle</h3>
+            <p className="text-xs text-slate-400 mb-6">Kasaya veya bankaya giren tutarı giriniz.</p>
+            <form onSubmit={handleAddPayment}>
+              <div className="mb-6 relative">
+                <label className="block text-xs font-bold text-blue-400 mb-2 uppercase">Tutar (TL)</label>
+                <div className="relative">
+                    <span className="absolute left-4 top-3.5 text-slate-400 font-bold text-lg">₺</span>
+                    <input 
+                    autoFocus
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={paymentAmount}
+                    onChange={e => setPaymentAmount(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-600 rounded-xl pl-10 pr-4 py-3 text-2xl font-bold text-white outline-none focus:border-emerald-500 transition-colors text-right"
+                    placeholder="0,00"
+                    />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => setIsPaymentModalOpen(false)}
+                  className="flex-1 px-4 py-3 text-slate-300 hover:text-white bg-slate-700 rounded-lg font-medium"
+                >
+                  İptal
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-[2] bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg font-bold shadow-lg shadow-emerald-900/20"
+                >
+                  Onayla
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default FirmDetails;

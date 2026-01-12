@@ -112,13 +112,13 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      devTools: false 
+      devTools: true // Geliştirme modunda konsolu açabilmek için
     },
     autoHideMenuBar: true,
     frame: true
   });
 
-  const startUrl = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, app.isPackaged ? 'index.html' : '../build/index.html')}`;
+  const startUrl = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, 'index.html')}`;
   
   mainWindow.loadURL(startUrl);
 

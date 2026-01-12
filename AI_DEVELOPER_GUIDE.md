@@ -1,47 +1,44 @@
-# AI DEVELOPER CONTEXT & GUIDE
+
+# AI DEVELOPER CONTEXT & GUIDE (v2.1.0)
 
 Bu dosya, bu proje üzerinde çalışacak diğer Yapay Zeka modelleri (ChatGPT, Claude, Copilot vb.) için sistemin mimarisini, kurallarını ve iş mantığını anlatır.
 
 ## 1. Proje Özeti
-Bu proje, OSGB (Ortak Sağlık Güvenlik Birimi) firmaları için geliştirilmiş, React + TypeScript tabanlı, yerel veri saklama (LocalStorage) prensibiyle çalışan bir ön muhasebe ve fatura takip sistemidir. Sistem Electron.js ile masaüstü uygulamasına dönüştürülebilir.
+Bu proje, OSGB (Ortak Sağlık Güvenlik Birimi) firmaları için geliştirilmiş, **React + TypeScript** tabanlı, **Electron.js** ile masaüstü uygulaması olarak çalışan, yerel veri saklama (LocalStorage/File System) prensibiyle kurgulanmış bir finans yönetim sistemidir.
 
-## 2. Teknoloji Yığını
-*   **Framework:** React 18
-*   **Dil:** TypeScript
-*   **Stil:** Tailwind CSS (Sadece Dark Theme kullanılır: slate-900, slate-800)
-*   **Router:** `react-router-dom` (HashRouter kullanılır, Electron uyumluluğu için zorunludur).
-*   **Veritabanı:** `src/services/db.ts` dosyası üzerinden yönetilen `localStorage` katmanı. (SQL yoktur).
-*   **Bulut:** Google Firebase Realtime Database (REST API ile, SDK yok).
+## 2. Mimari (Hybrid Architecture)
+Sistem **İstemci-Sunucu (Client-Server)** mantığını simüle eder ama tek bir uygulama içindedir.
+*   **Main Process (`public/electron.js`):** 
+    *   Node.js üzerinde çalışır.
+    *   `Express.js` sunucusu barındırır (Port 5000).
+    *   Dosya sistemine (`database.json`) doğrudan erişimi vardır.
+    *   Mobilden gelen istekleri karşılar.
+*   **Renderer Process (React):**
+    *   Kullanıcı arayüzüdür.
+    *   Masaüstünde çalışırken `window.require('fs')` ile dosyayı doğrudan okur.
+    *   Tarayıcıda (Mobilde) çalışırken `fetch('http://IP:5000/api/db')` ile veriyi çeker.
 
 ## 3. Kritik İş Mantığı (Business Logic)
 
-### A. Fatura Döngüsü (Life Cycle)
-Sistemde faturalar iki aşamalıdır:
-1.  **Preparation (Hazırlık):** Kullanıcı "Fatura Hazırlık" sayfasında hesaplamaları yapar. "Taslak Oluştur" dediğinde `Transaction` tablosuna `status: 'PENDING'` olarak kaydedilir. Bu aşamada cari bakiyeyi ETKİLEMEZ.
-2.  **Approval (Onay):** "Kesilecek Faturalar" sayfasında kullanıcı taslağı onaylar. Statü `status: 'APPROVED'` olur. Artık cari bakiyeye ve Dashboard grafiklerine yansır.
+### A. Fatura Döngüsü
+1.  **Preparation (Hazırlık):** Kullanıcı "Fatura Hazırlık" sayfasında kişi sayılarını girer.
+2.  **Calculation (Hesaplama):** Sistem firmanın `pricingModel` (Standart, Toleranslı, Kademeli) ayarına göre tutarı hesaplar.
+3.  **Draft (Taslak):** `Transaction` tablosuna `status: 'PENDING'` olarak kaydedilir.
+4.  **Approval (Onay):** Kullanıcı onayladığında `status: 'APPROVED'` olur ve cari bakiyeye işler.
 
-### B. Fiyatlandırma Modelleri (Pricing Models)
-Her firmanın `pricingModel` alanı vardır:
-1.  **STANDARD:** `Taban Ücret + ((Çalışan Sayısı - Limit) * Ekstra Ücret)`
-2.  **TOLERANCE:** Belirlenen `%` tolerans aralığındaysa fiyat sabittir. Dışına çıkarsa artar veya azalır.
-3.  **TIERED (Kademeli):** `PricingTier[]` dizisine bakılır. Çalışan sayısı hangi `min-max` aralığındaysa o fiyat uygulanır.
+### B. Fiyatlandırma Modelleri
+*   **STANDARD:** `Taban Ücret + ((Çalışan - Limit) * Ekstra Ücret)`
+*   **TOLERANCE:** Standart hesaba ek olarak, eğer artış `%X` oranının altındaysa ekstra ücret yansıtmaz.
+*   **TIERED (Kademeli):** `PricingTier[]` dizisindeki aralıklara bakar (Örn: 0-50 kişi -> 5000 TL).
 
-### C. Hakediş Hesaplama
-Fatura tutarı üzerinden Uzman ve Doktor payları hesaplanır.
-*   **Global Ayarlar:** Bu yüzdeler `GlobalSettings` altından gelir. Firma bazlı değildir.
-*   **Net Tutar Gösterimi:** Raporlarda ve listede Uzman payı 1.2'ye, Doktor ve Sağlık payı 1.1'e bölünerek (KDV hariç gibi) gösterilir. Veritabanında ise BRÜT saklanır.
+### C. Hakediş
+OSGB sektörüne özel olarak, her faturanın içinde "Uzman Payı", "Hekim Payı" ve "Sağlık Payı" arka planda hesaplanır ve raporlanır.
 
 ## 4. Dosya Yapısı ve Kurallar
-*   `src/services/db.ts`: Tüm veri okuma/yazma işlemleri buradadır. `uuid` veya `crypto` kütüphanesi KULLANILMAZ. Yerel ID üreteci (`Date.now() + Math.random`) kullanılır.
-*   `src/types.ts`: Tüm veri tipleri buradadır.
-*   `src/services/cloud.ts`: Firebase işlemleri buradadır.
-*   **Router:** Asla `BrowserRouter` kullanma. Electron.js dosya protokolü (`file://`) ile çalıştığı için `HashRouter` zorunludur.
+*   `src/services/db.ts`: Veri katmanıdır. Hem Electron (fs) hem Web (fetch) mantığını soyutlar.
+*   **Router:** `HashRouter` zorunludur. `BrowserRouter` Electron'da dosya yolu hatası verir.
+*   **Stil:** Tailwind CSS. `slate-900` (Background), `slate-800` (Cards).
 
-## 5. Dikkat Edilmesi Gerekenler
-1.  **Null Check:** Veriler localStorage'dan geldiği için her zaman `undefined` veya `null` kontrolü yap.
-2.  **Empty States:** Listeler boşken kullanıcıya "Kayıt yok" mesajı göster.
-3.  **Responsive:** Tablolar mobilde taşmamalı (`overflow-x-auto`).
-4.  **Renk Paleti:** Arka plan `bg-slate-950`, Kartlar `bg-slate-800`, Metinler `text-slate-200`.
-
-## 6. Gelecek Geliştirmeler İçin Notlar
-Eğer sisteme yeni bir özellik eklenecekse (Örn: Stok Takibi), mutlaka `STORAGE_KEYS` içine yeni bir key eklenmeli ve `getFullBackup` fonksiyonuna dahil edilmelidir. Aksi takdirde yedekleme çalışmaz.
+## 5. Gelecek Geliştirmeler İçin Notlar
+*   Yeni bir özellik eklerken `types.ts` içerisindeki `Transaction` veya `Firm` interface'lerini güncelleyin.
+*   Veritabanı şeması değişirse `db.ts` içinde `initData` fonksiyonuna migrasyon (migration) mantığı ekleyin.
