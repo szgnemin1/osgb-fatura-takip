@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/db';
-import { Save, Building2, CheckCircle2, Trash2, Edit, Plus, X, Network, Stethoscope, CheckSquare, Square, Search } from 'lucide-react';
+import { Save, Building2, CheckCircle2, Trash2, Edit, Plus, X, Network, Stethoscope, CheckSquare, Square, Search, FileText } from 'lucide-react';
 import { InvoiceType, Firm, PricingModel, PricingTier, ServiceType } from '../types';
 
 const FirmRegistration = () => {
@@ -220,7 +220,7 @@ const FirmRegistration = () => {
           <Building2 className="w-8 h-8 text-blue-500" />
           {isEditing ? 'Firma Düzenle' : 'Firma Kayıt & Parametreler'}
         </h2>
-        <p className="text-slate-400 mt-2">Çoklu fiyatlandırma modelleri ve yıllık ücret tanımlamaları.</p>
+        <p className="text-slate-400 mt-2">Çoklu fiyatlandırma modelleri, fatura tipleri ve yıllık ücret tanımlamaları.</p>
       </header>
 
       {successMessage && (
@@ -264,12 +264,18 @@ const FirmRegistration = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Fatura Tipi</label>
-                    <select name="defaultInvoiceType" value={formData.defaultInvoiceType} onChange={handleChange} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-blue-500 outline-none">
-                    <option value={InvoiceType.E_FATURA}>E-Fatura</option>
-                    <option value={InvoiceType.E_ARSIV}>E-Arşiv</option>
-                    </select>
+                  <div className="bg-slate-900/50 p-2 rounded-lg border border-slate-700">
+                    <label className="block text-xs font-bold text-slate-400 mb-1 uppercase">Varsayılan Fatura Tipi</label>
+                    <div className="flex gap-2">
+                        <label className={`flex-1 cursor-pointer text-center py-2 rounded text-xs font-bold transition-all ${formData.defaultInvoiceType === InvoiceType.E_FATURA ? 'bg-indigo-600 text-white shadow' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>
+                            <input type="radio" name="defaultInvoiceType" value={InvoiceType.E_FATURA} checked={formData.defaultInvoiceType === InvoiceType.E_FATURA} onChange={handleChange} className="hidden" />
+                            E-FATURA
+                        </label>
+                        <label className={`flex-1 cursor-pointer text-center py-2 rounded text-xs font-bold transition-all ${formData.defaultInvoiceType === InvoiceType.E_ARSIV ? 'bg-orange-600 text-white shadow' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}>
+                            <input type="radio" name="defaultInvoiceType" value={InvoiceType.E_ARSIV} checked={formData.defaultInvoiceType === InvoiceType.E_ARSIV} onChange={handleChange} className="hidden" />
+                            E-ARŞİV
+                        </label>
+                    </div>
                 </div>
                  <div>
                     <label className="block text-sm font-medium text-purple-400 mb-1">Yıllık İşlem Ücreti</label>
@@ -289,19 +295,21 @@ const FirmRegistration = () => {
                 <p className="text-xs text-slate-500 mt-1">Fatura açıklaması ve hesaplama bu seçime göre yapılır.</p>
               </div>
 
-               {/* E-ARŞİV EKSTRA ALANLAR */}
-                {formData.defaultInvoiceType === InvoiceType.E_ARSIV && (
-                    <div className="grid grid-cols-2 gap-4 p-3 bg-orange-500/5 border border-orange-500/20 rounded-lg">
-                        <div>
-                            <label className="block text-xs font-medium text-orange-400 mb-1">Vergi No</label>
-                            <input type="text" name="taxNumber" value={formData.taxNumber || ''} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-orange-400 mb-1">Adres</label>
-                            <textarea name="address" value={formData.address || ''} onChange={handleChange} className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-white text-sm h-8 resize-none overflow-hidden" />
-                        </div>
+               {/* VERGİ VE ADRES (HER ZAMAN GÖRÜNÜR) */}
+               <div className="grid grid-cols-2 gap-4 p-3 bg-slate-700/30 border border-slate-600 rounded-lg">
+                    <div className="col-span-2 text-[10px] text-slate-400 flex items-center gap-2">
+                        <FileText className="w-3 h-3" />
+                        <span>Fatura kesimi için aşağıdaki bilgilerin doğruluğu önemlidir.</span>
                     </div>
-                )}
+                    <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Vergi No / TCKN</label>
+                        <input type="text" name="taxNumber" value={formData.taxNumber || ''} onChange={handleChange} placeholder="VKN veya TCKN" className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-2 text-white text-sm focus:border-blue-500 outline-none" />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Firma Adresi</label>
+                        <textarea name="address" value={formData.address || ''} onChange={handleChange} placeholder="Fatura Adresi" className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-2 text-white text-sm h-[38px] resize-none overflow-hidden focus:border-blue-500 outline-none" />
+                    </div>
+                </div>
             </div>
           </div>
 
@@ -402,7 +410,7 @@ const FirmRegistration = () => {
                             </button>
                         </th>
                         <th className="p-4 text-slate-400">Firma Adı</th>
-                        <th className="p-4 text-slate-400">Model</th>
+                        <th className="p-4 text-slate-400">Tip</th>
                         <th className="p-4 text-slate-400 text-right">Taban Fiyat</th>
                         <th className="p-4 text-slate-400 text-center">Hizmet Türü</th>
                         <th className="p-4 text-slate-400 text-center">KDV</th>
@@ -422,10 +430,11 @@ const FirmRegistration = () => {
                                 {firm.parentFirmId && <span className="ml-2 text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">Şube</span>}
                             </td>
                             <td className="p-4 text-slate-400 text-sm">
-                                <div className="flex flex-col">
-                                    <span>{firm.pricingModel}</span>
-                                    <span className="text-xs text-slate-500">{firm.defaultInvoiceType}</span>
-                                </div>
+                                {firm.defaultInvoiceType === InvoiceType.E_FATURA ? (
+                                    <span className="text-[10px] bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded border border-indigo-500/30">E-FATURA</span>
+                                ) : (
+                                    <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-1 rounded border border-orange-500/30">E-ARŞİV</span>
+                                )}
                             </td>
                             <td className="p-4 text-slate-400 text-right">{new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(firm.baseFee)}</td>
                             <td className="p-4 text-center">

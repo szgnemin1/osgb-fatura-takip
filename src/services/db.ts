@@ -1,6 +1,6 @@
 
 
-import { Firm, Transaction, TransactionType, PreparationItem, InvoiceType, GlobalSettings } from '../types';
+import { Firm, Transaction, TransactionType, PreparationItem, InvoiceType, GlobalSettings, PricingTier } from '../types';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -11,7 +11,8 @@ const STORAGE_KEYS = {
   TRANSACTIONS: 'osgb_transactions',
   PREPARATION: 'osgb_preparation',
   GLOBAL_SETTINGS: 'osgb_global_settings',
-  LOGS: 'osgb_logs'
+  LOGS: 'osgb_logs',
+  CLOUD_CONFIG: 'osgb_cloud_config'
 };
 
 let fs: any;
@@ -20,16 +21,11 @@ const isElectron = typeof window !== 'undefined' && (window as any).process && (
 const isBrowserClient = !isElectron; 
 
 // --- VERİ ÇAKIŞMA KİLİDİ ---
-// Kullanıcı veri girişi yaparken (yazarken) kilitlenir.
 let isWritingToDisk = false;
-
-// --- EVENT EMITTER SİSTEMİ ---
 type Listener = () => void;
 let listeners: Listener[] = [];
 
-const notifyListeners = () => {
-    listeners.forEach(l => l());
-};
+const notifyListeners = () => { listeners.forEach(l => l()); };
 
 // API URL
 const getApiUrl = () => {
@@ -44,51 +40,32 @@ if (isElectron) {
     const requireFunc = (window as any).require;
     fs = requireFunc('fs');
     const { ipcRenderer } = requireFunc('electron');
-    
     dbFilePath = ipcRenderer.sendSync('get-db-path');
-    console.log("Veritabanı Yolu:", dbFilePath);
-
-    // 1. YÖNTEM: Sunucudan gelen sinyali dinle (Anlık)
+    
     ipcRenderer.on('external-data-update', () => {
-        console.log("⚡ Sunucudan anlık güncelleme sinyali!");
-        // Kilide bakmaksızın güncellemeyi dene (Son yazan kazanır)
         db.initData(true).then(() => notifyListeners());
     });
 
-    // 2. YÖNTEM: Periyodik Dosya Kontrolü (Yedek Güvence)
-    // Sinyal kaçarsa diye her 3 saniyede bir dosyayı kontrol et.
     setInterval(() => {
         if (!isWritingToDisk) {
-            db.initData(false).then((changed) => {
-                if(changed) notifyListeners();
-            });
+            db.initData(false).then((changed) => { if(changed) notifyListeners(); });
         }
     }, 3000);
-
-  } catch (e) {
-    console.error("Electron modülleri yüklenemedi:", e);
-  }
+  } catch (e) { console.error("Electron modülleri yüklenemedi:", e); }
 }
 
-// --- MOBİL İÇİN POLLING (Periyodik Kontrol) ---
 if (isBrowserClient) {
     setInterval(async () => {
         if (isWritingToDisk) return;
-
-        // initData artık değişiklik olup olmadığını döndürüyor
         const changed = await db.initData(false);
-        if (changed) {
-            console.log("🔄 Mobilde yeni veri algılandı.");
-            notifyListeners();
-        }
+        if (changed) notifyListeners();
     }, 2000); 
 }
 
 // Diske Yazma
 let saveTimeout: any = null;
 const persistData = (sync: boolean = false) => {
-    isWritingToDisk = true; // Kilit koy
-
+    isWritingToDisk = true;
     const fullData: any = {};
     Object.values(STORAGE_KEYS).forEach(k => {
         const item = localStorage.getItem(k);
@@ -103,34 +80,23 @@ const persistData = (sync: boolean = false) => {
             } else {
                 fs.writeFile(dbFilePath, JSON.stringify(fullData, null, 2), (err: any) => {
                     setTimeout(() => { isWritingToDisk = false; }, 500);
-                    if (err) console.error("Yazma hatası:", err);
                 });
             }
-        } catch(e) { 
-            console.error("Yazma hatası:", e);
-            isWritingToDisk = false;
-        }
+        } catch(e) { isWritingToDisk = false; }
     } else if (isBrowserClient) {
         fetch(getApiUrl(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(fullData),
             keepalive: true 
-        })
-        .then(() => {})
-        .catch(e => console.error("Sunucuya yazma hatası:", e))
-        .finally(() => {
-            setTimeout(() => { isWritingToDisk = false; }, 500);
-        });
+        }).finally(() => { setTimeout(() => { isWritingToDisk = false; }, 500); });
     }
 };
 
 const debounceSaveToDisk = () => {
     isWritingToDisk = true;
     if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => {
-        persistData(false);
-    }, 500);
+    saveTimeout = setTimeout(() => { persistData(false); }, 500);
 };
 
 const getStorage = <T>(key: string, defaultValue: T): T => {
@@ -150,75 +116,41 @@ const setStorage = <T>(key: string, value: T) => {
 export const db = {
   subscribe: (listener: Listener) => {
       listeners.push(listener);
-      return () => {
-          listeners = listeners.filter(l => l !== listener);
-      };
+      return () => { listeners = listeners.filter(l => l !== listener); };
   },
 
-  // initData artık boolean (değişiklik var mı?) döndürüyor
   initData: async (forceReadDisk = false): Promise<boolean> => {
     if (isWritingToDisk && !forceReadDisk) return false;
-
     let hasChanged = false;
-
     if (isElectron && fs && dbFilePath) {
         if (fs.existsSync(dbFilePath)) {
             try {
                 const rawData = fs.readFileSync(dbFilePath, 'utf-8');
                 const parsedData = JSON.parse(rawData);
-                
-                // Mevcut veri ile kıyasla
-                const currentStr = JSON.stringify({
-                    firms: localStorage.getItem(STORAGE_KEYS.FIRMS),
-                    trans: localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)
-                });
-                const newStr = JSON.stringify({
-                    firms: parsedData[STORAGE_KEYS.FIRMS],
-                    trans: parsedData[STORAGE_KEYS.TRANSACTIONS]
-                });
+                const currentStr = JSON.stringify({ firms: localStorage.getItem(STORAGE_KEYS.FIRMS) });
+                const newStr = JSON.stringify({ firms: parsedData[STORAGE_KEYS.FIRMS] });
 
                 if (currentStr !== newStr || forceReadDisk) {
                     if (Object.keys(parsedData).length > 0) {
-                        Object.keys(parsedData).forEach(key => {
-                            if(parsedData[key]) localStorage.setItem(key, parsedData[key]);
-                        });
+                        Object.keys(parsedData).forEach(key => { if(parsedData[key]) localStorage.setItem(key, parsedData[key]); });
                         hasChanged = true;
                     }
-                } else if (!forceReadDisk && Object.keys(parsedData).length === 0) {
-                    // Dosya boşsa, eldeki veriyi yaz (İlk kurulum)
-                    persistData(true);
-                }
-            } catch (e) { console.error("Veritabanı okuma hatası:", e); }
-        } else {
-            persistData(true);
-        }
-    } 
-    else if (isBrowserClient) {
+                } else if (!forceReadDisk && Object.keys(parsedData).length === 0) { persistData(true); }
+            } catch (e) {}
+        } else { persistData(true); }
+    } else if (isBrowserClient) {
         try {
-            const url = getApiUrl();
-            const res = await fetch(url);
+            const res = await fetch(getApiUrl());
             if (res.ok) {
                 const remoteData = await res.json();
-                
-                const currentStr = JSON.stringify({
-                    firms: localStorage.getItem(STORAGE_KEYS.FIRMS),
-                    trans: localStorage.getItem(STORAGE_KEYS.TRANSACTIONS)
-                });
-                const newStr = JSON.stringify({
-                    firms: remoteData[STORAGE_KEYS.FIRMS],
-                    trans: remoteData[STORAGE_KEYS.TRANSACTIONS]
-                });
-
-                if (currentStr !== newStr) {
-                    if (Object.keys(remoteData).length > 0) {
-                        Object.keys(remoteData).forEach(key => {
-                            if(remoteData[key]) localStorage.setItem(key, remoteData[key]);
-                        });
-                        hasChanged = true;
-                    }
+                const currentStr = JSON.stringify({ firms: localStorage.getItem(STORAGE_KEYS.FIRMS) });
+                const newStr = JSON.stringify({ firms: remoteData[STORAGE_KEYS.FIRMS] });
+                if (currentStr !== newStr && Object.keys(remoteData).length > 0) {
+                    Object.keys(remoteData).forEach(key => { if(remoteData[key]) localStorage.setItem(key, remoteData[key]); });
+                    hasChanged = true;
                 }
             }
-        } catch (e) { console.error("Sunucu bağlantı hatası:", e); }
+        } catch (e) {}
     }
     return hasChanged;
   },
@@ -275,9 +207,7 @@ export const db = {
 
   getPreparationItems: (): PreparationItem[] => getStorage<PreparationItem[]>(STORAGE_KEYS.PREPARATION, []),
   
-  savePreparationItems: (items: PreparationItem[]) => {
-    setStorage(STORAGE_KEYS.PREPARATION, items);
-  },
+  savePreparationItems: (items: PreparationItem[]) => { setStorage(STORAGE_KEYS.PREPARATION, items); },
 
   getStats: () => {
     const transactions = getStorage<Transaction[]>(STORAGE_KEYS.TRANSACTIONS, []).filter(t => (t.status || 'APPROVED') === 'APPROVED');
@@ -328,15 +258,96 @@ export const db = {
       } catch (e) { return "Hata"; }
   },
 
-  bulkImportFirms: (data: any) => { return { newFirmsCount: 0, newTransCount: 0 } },
+  bulkImportFirms: (data: any[]) => {
+    const currentFirms = getStorage<Firm[]>(STORAGE_KEYS.FIRMS, []);
+    const currentTrans = getStorage<Transaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
+    let newFirmsCount = 0;
+    let newTransCount = 0;
+
+    data.forEach(row => {
+      const name = row['Firma Adı'] || row['name'];
+      if (!name) return;
+      if (currentFirms.some(f => f.name.toLowerCase() === name.toLowerCase())) return;
+      const newId = generateId();
+      const newFirm: Firm = {
+        id: newId,
+        name: name,
+        basePersonLimit: Number(row['Taban Kişi']) || 10,
+        baseFee: Number(row['Taban Ücret']) || 1000,
+        extraPersonFee: Number(row['Ekstra Kişi Ücreti']) || 50,
+        expertPercentage: Number(row['Uzman %']) || 60,
+        doctorPercentage: Number(row['Doktor %']) || 40,
+        defaultInvoiceType: row['Fatura Tipi'] === 'E-Arşiv' ? InvoiceType.E_ARSIV : InvoiceType.E_FATURA,
+        pricingModel: row['Fiyatlandırma Modeli'] || 'STANDART',
+        tolerancePercentage: Number(row['Tolerans Yüzdesi']) || 0,
+        isKdvExcluded: row['Fiyatlar KDV Hariç mi?'] === 'Evet'
+      };
+      currentFirms.push(newFirm);
+      newFirmsCount++;
+      const openingBalance = Number(row['Başlangıç Borcu']) || 0;
+      if (openingBalance > 0) {
+        currentTrans.push({
+          id: generateId(), firmId: newId, date: new Date().toISOString(), type: TransactionType.INVOICE, description: 'Açılış Devir Bakiyesi', debt: openingBalance, credit: 0, month: new Date().getMonth() + 1, year: new Date().getFullYear(), status: 'APPROVED', invoiceType: newFirm.defaultInvoiceType
+        });
+        newTransCount++;
+      }
+    });
+    setStorage(STORAGE_KEYS.FIRMS, currentFirms);
+    setStorage(STORAGE_KEYS.TRANSACTIONS, currentTrans);
+    return { newFirmsCount, newTransCount };
+  },
+
+  // --- YENİ: FİYAT GÜNCELLEME (UPDATE IMPORT) ---
+  bulkUpdatePricing: (generalData: any[], tierData: any[]) => {
+      const currentFirms = getStorage<Firm[]>(STORAGE_KEYS.FIRMS, []);
+      let updatedCount = 0;
+
+      generalData.forEach(row => {
+          const id = row['ID (DOKUNMAYIN)'];
+          if (!id) return;
+          const firmIndex = currentFirms.findIndex(f => f.id === id);
+          if (firmIndex !== -1) {
+              currentFirms[firmIndex].baseFee = Number(row['Taban Ücret']) || 0;
+              currentFirms[firmIndex].basePersonLimit = Number(row['Taban Kişi Limiti']) || 0;
+              currentFirms[firmIndex].extraPersonFee = Number(row['Ekstra Kişi Ücreti']) || 0;
+              currentFirms[firmIndex].yearlyFee = Number(row['Yıllık İşlem Ücreti']) || 0;
+              currentFirms[firmIndex].pricingModel = row['Model (STANDART/KADEMELI)'] || currentFirms[firmIndex].pricingModel;
+              currentFirms[firmIndex].tolerancePercentage = Number(row['Tolerans (%)']) || 0;
+              currentFirms[firmIndex].tiers = [];
+              updatedCount++;
+          }
+      });
+
+      if (tierData && tierData.length > 0) {
+          tierData.forEach(row => {
+              const id = row['Firma ID (DOKUNMAYIN)'];
+              if (!id) return;
+              const firm = currentFirms.find(f => f.id === id);
+              if (firm) {
+                  const newTier: PricingTier = { min: Number(row['Min Kişi']) || 0, max: Number(row['Max Kişi']) || 0, price: Number(row['Fiyat']) || 0 };
+                  if (!firm.tiers) firm.tiers = [];
+                  firm.tiers.push(newTier);
+              }
+          });
+      }
+      setStorage(STORAGE_KEYS.FIRMS, currentFirms);
+      return updatedCount;
+  },
   
   factoryReset: () => {
       localStorage.clear();
-      if (isElectron && fs && dbFilePath) {
-          try { fs.writeFileSync(dbFilePath, JSON.stringify({}, null, 2)); } catch (e) {}
-      }
+      if (isElectron && fs && dbFilePath) { try { fs.writeFileSync(dbFilePath, JSON.stringify({}, null, 2)); } catch (e) {} }
       notifyListeners();
   },
 
-  clearAllTransactions: () => { setStorage(STORAGE_KEYS.TRANSACTIONS, []); }
+  clearAllTransactions: () => { setStorage(STORAGE_KEYS.TRANSACTIONS, []); },
+
+  // CLOUD CONFIG
+  getCloudUrl: () => {
+    return getStorage<string>(STORAGE_KEYS.CLOUD_CONFIG, '');
+  },
+
+  saveCloudUrl: (url: string) => {
+    setStorage(STORAGE_KEYS.CLOUD_CONFIG, url);
+  }
 };

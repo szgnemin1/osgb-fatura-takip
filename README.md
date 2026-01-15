@@ -28,7 +28,7 @@
 ### 1. 📱 Hibrit Veri Mimarisi (Masaüstü & Mobil)
 *   **Ana Makine (Host):** Windows bilgisayarınızda `.exe` olarak çalışır ve veritabanını (`JSON`) yerel diskte tutar.
 *   **Mobil Erişim:** Aynı Wi-Fi ağındaki telefon veya tabletlerden, ana makinenin IP adresi üzerinden sisteme bağlanabilirsiniz.
-*   **Canlı Senkronizasyon:** Masaüstünde yapılan bir değişiklik anında mobilde görünür.
+*   **Canlı Senkronizasyon:** Masaüstünde yapılan bir değişiklik anında mobilde, mobilde yapılan bir tahsilat anında masaüstünde görünür.
 
 ### 2. 💰 Gelişmiş Fiyatlandırma Motoru
 Her firma için farklı sözleşme modelleri tanımlayabilirsiniz:

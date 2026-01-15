@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
-import { Firm, Transaction, TransactionType } from '../types';
+import { Firm, Transaction, TransactionType, InvoiceType } from '../types';
 import { exporter } from '../services/exporter';
 import { FileText, Search, PlusCircle, ArrowDownLeft, ArrowUpRight, Building2, Download, Table, ArrowLeft, Wallet, ChevronRight } from 'lucide-react';
 
@@ -209,6 +209,11 @@ const FirmDetails = () => {
                            <div className="flex items-center gap-2">
                                {t.type === TransactionType.INVOICE ? <ArrowUpRight className="w-3 h-3 text-rose-500 shrink-0"/> : <ArrowDownLeft className="w-3 h-3 text-emerald-500 shrink-0"/>}
                                <span className="line-clamp-2">{t.description}</span>
+                               {t.type === TransactionType.INVOICE && t.invoiceType && (
+                                   <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold whitespace-nowrap ${t.invoiceType === InvoiceType.E_FATURA ? 'bg-indigo-500/20 text-indigo-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                                       {t.invoiceType === InvoiceType.E_FATURA ? 'E-FAT' : 'E-ARŞ'}
+                                   </span>
+                               )}
                            </div>
                         </td>
                         <td className="p-3 md:p-4 text-right text-rose-400 font-medium text-xs md:text-sm whitespace-nowrap bg-rose-500/0 group-hover:bg-rose-500/5 transition-colors">

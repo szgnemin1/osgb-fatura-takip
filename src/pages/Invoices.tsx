@@ -107,6 +107,13 @@ const SmartCopyButton = ({ inv, globalSettings, allTransactions, firms }: { inv:
     );
 };
 
+const InvoiceTypeBadge = ({ type }: { type?: InvoiceType }) => {
+    if (type === InvoiceType.E_FATURA) {
+        return <span className="text-[10px] font-bold bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded border border-indigo-500/30 whitespace-nowrap">E-FATURA</span>;
+    }
+    return <span className="text-[10px] font-bold bg-orange-500/20 text-orange-400 px-2 py-1 rounded border border-orange-500/30 whitespace-nowrap">E-ARŞİV</span>;
+};
+
 type InvoiceWithDetails = Transaction & { firmName: string; taxNumber?: string; address?: string; };
 
 const Invoices = () => {
@@ -238,7 +245,9 @@ const Invoices = () => {
                   <td className="p-4 text-center text-sm"><div className="flex flex-col items-center gap-1"><span className="font-medium text-slate-300">{formatCurrency(netDoctor)}</span><CopyBadge text={netDoctor} /></div></td>
                   <td className="p-4 text-center text-sm"><div className="flex flex-col items-center gap-1"><span className="font-medium text-slate-300">{formatCurrency(netHealth)}</span><CopyBadge text={netHealth} /></div></td>
                   <td className="p-4 text-right"><div className="flex flex-col items-end gap-1"><span className="font-bold text-slate-200 text-base">{formatCurrency(inv.debt)}</span><CopyBadge text={inv.debt} /></div></td>
-                  <td className="p-4 text-center text-xs text-slate-500">{inv.invoiceType}</td>
+                  <td className="p-4 text-center text-xs">
+                     <InvoiceTypeBadge type={inv.invoiceType} />
+                  </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                         <SmartCopyButton inv={inv} globalSettings={globalSettings} allTransactions={allTransactions} firms={firms} />
@@ -268,7 +277,7 @@ const Invoices = () => {
                             </button>
                             <div>
                                 <h4 className="font-bold text-slate-200 text-sm">{inv.firmName}</h4>
-                                <span className="text-[10px] text-slate-500 uppercase tracking-wide bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">{inv.invoiceType}</span>
+                                <div className="mt-1"><InvoiceTypeBadge type={inv.invoiceType} /></div>
                             </div>
                         </div>
                         <div className="text-right">
@@ -319,7 +328,10 @@ const Invoices = () => {
                 <tbody className="divide-y divide-slate-700">
                   {filteredApproved.map(inv => (
                     <tr key={inv.id}>
-                      <td className="p-4 text-slate-400 text-sm">{inv.firmName}</td>
+                      <td className="p-4 text-slate-400 text-sm">
+                          <div>{inv.firmName}</div>
+                          <div className="mt-1"><InvoiceTypeBadge type={inv.invoiceType} /></div>
+                      </td>
                       <td className="p-4 text-slate-500 text-sm">{new Date(inv.date).toLocaleDateString('tr-TR')}</td>
                       <td className="p-4 text-right text-slate-400 text-sm">{formatCurrency(inv.debt)}</td>
                       <td className="p-4 text-center"><span className="text-xs bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded-full">Onaylandı</span></td>
