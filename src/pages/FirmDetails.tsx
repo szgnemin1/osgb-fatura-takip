@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Firm, Transaction, TransactionType, InvoiceType } from '../types';
 import { exporter } from '../services/exporter';
-import { FileText, Search, PlusCircle, ArrowDownLeft, ArrowUpRight, Building2, Download, Table, ArrowLeft, Wallet, ChevronRight } from 'lucide-react';
+import { FileText, Search, PlusCircle, ArrowDownLeft, ArrowUpRight, Building2, Download, Table, ArrowLeft, Wallet, ChevronRight, MinusCircle } from 'lucide-react';
 
 const FirmDetails = () => {
   const [firms, setFirms] = useState<Firm[]>([]);
@@ -11,9 +11,11 @@ const FirmDetails = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Payment Modal State
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState('');
+  // Modal States
+  const [activeModal, setActiveModal] = useState<'PAYMENT' | 'DEBT' | null>(null);
+  const [amount, setAmount] = useState('');
+  const [transDate, setTransDate] = useState('');
+  const [description, setDescription] = useState('');
 
   useEffect(() => {
     setFirms(db.getFirms());
@@ -29,28 +31,38 @@ const FirmDetails = () => {
     } else {
       setTransactions([]);
     }
-  }, [selectedFirmId, isPaymentModalOpen]);
+  }, [selectedFirmId, activeModal]);
 
   const filteredFirms = firms.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const handleAddPayment = (e: React.FormEvent) => {
+  const openModal = (type: 'PAYMENT' | 'DEBT') => {
+    setActiveModal(type);
+    setAmount('');
+    setTransDate(new Date().toISOString().split('T')[0]); // Bugünün tarihi YYYY-MM-DD
+    setDescription(type === 'PAYMENT' ? 'Tahsilat' : 'Borç Dekontu / Manuel İşlem');
+  };
+
+  const handleSaveTransaction = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFirmId || !paymentAmount) return;
+    if (!selectedFirmId || !amount || !transDate) return;
+
+    const dateObj = new Date(transDate);
 
     db.addTransaction({
       firmId: selectedFirmId,
-      date: new Date().toISOString(),
-      type: TransactionType.PAYMENT,
-      description: 'Tahsilat',
-      debt: 0,
-      credit: Number(paymentAmount),
-      month: new Date().getMonth() + 1,
-      year: new Date().getFullYear(),
+      date: dateObj.toISOString(),
+      type: activeModal === 'PAYMENT' ? TransactionType.PAYMENT : TransactionType.INVOICE,
+      description: description,
+      debt: activeModal === 'DEBT' ? Number(amount) : 0,
+      credit: activeModal === 'PAYMENT' ? Number(amount) : 0,
+      month: dateObj.getMonth() + 1,
+      year: dateObj.getFullYear(),
       status: 'APPROVED'
     });
 
-    setIsPaymentModalOpen(false);
-    setPaymentAmount('');
+    setActiveModal(null);
+    setAmount('');
+    setDescription('');
   };
 
   const exportSingleFirm = () => {
@@ -178,14 +190,24 @@ const FirmDetails = () => {
                     <Download className="w-5 h-5" />
                   </button>
                 </div>
-                <button 
-                  onClick={() => setIsPaymentModalOpen(true)}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 transition-colors shadow-lg"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span className="hidden md:inline">Tahsilat Ekle</span>
-                  <span className="md:hidden">Tahsilat</span>
-                </button>
+                
+                <div className="flex gap-2">
+                    <button 
+                      onClick={() => openModal('DEBT')}
+                      className="bg-rose-700 hover:bg-rose-600 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 transition-colors shadow-lg"
+                    >
+                      <MinusCircle className="w-4 h-4" />
+                      <span className="hidden md:inline">Borç Ekle</span>
+                    </button>
+
+                    <button 
+                      onClick={() => openModal('PAYMENT')}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-semibold flex items-center gap-2 transition-colors shadow-lg"
+                    >
+                      <PlusCircle className="w-4 h-4" />
+                      <span className="hidden md:inline">Tahsilat Ekle</span>
+                    </button>
+                </div>
               </div>
 
               {/* Table Container */}
@@ -267,15 +289,48 @@ const FirmDetails = () => {
         </div>
       </div>
 
-      {/* Payment Modal */}
-      {isPaymentModalOpen && (
+      {/* Generic Modal (Debt or Payment) */}
+      {activeModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
           <div className="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-200 relative">
-            <button onClick={() => setIsPaymentModalOpen(false)} className="absolute top-4 right-4 text-slate-500 hover:text-white"><ArrowLeft className="w-5 h-5 rotate-180" /></button>
-            <h3 className="text-xl font-bold text-white mb-1">Tahsilat Ekle</h3>
-            <p className="text-xs text-slate-400 mb-6">Kasaya veya bankaya giren tutarı giriniz.</p>
-            <form onSubmit={handleAddPayment}>
-              <div className="mb-6 relative">
+            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-slate-500 hover:text-white"><ArrowLeft className="w-5 h-5 rotate-180" /></button>
+            
+            <h3 className={`text-xl font-bold mb-1 ${activeModal === 'PAYMENT' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {activeModal === 'PAYMENT' ? 'Tahsilat Ekle' : 'Borç Ekle'}
+            </h3>
+            <p className="text-xs text-slate-400 mb-6">
+                {activeModal === 'PAYMENT' ? 'Kasaya/Bankaya giren tutarı işleyin.' : 'Manuel borç veya açılış bakiyesi ekleyin.'}
+            </p>
+            
+            <form onSubmit={handleSaveTransaction} className="space-y-4">
+              
+              {/* Tarih */}
+              <div>
+                 <label className="block text-xs font-bold text-slate-400 mb-1">Tarih</label>
+                 <input 
+                    type="date" 
+                    required 
+                    value={transDate} 
+                    onChange={e => setTransDate(e.target.value)} 
+                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white outline-none focus:border-blue-500"
+                 />
+              </div>
+
+              {/* Açıklama */}
+              <div>
+                 <label className="block text-xs font-bold text-slate-400 mb-1">Açıklama</label>
+                 <input 
+                    type="text" 
+                    required 
+                    value={description} 
+                    onChange={e => setDescription(e.target.value)} 
+                    placeholder={activeModal === 'PAYMENT' ? 'EFT / Nakit Tahsilat' : 'Devir Bakiyesi / Fatura Harici Borç'}
+                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white outline-none focus:border-blue-500"
+                 />
+              </div>
+
+              {/* Tutar */}
+              <div className="relative">
                 <label className="block text-xs font-bold text-blue-400 mb-2 uppercase">Tutar (TL)</label>
                 <div className="relative">
                     <span className="absolute left-4 top-3.5 text-slate-400 font-bold text-lg">₺</span>
@@ -285,26 +340,27 @@ const FirmDetails = () => {
                     min="0"
                     step="0.01"
                     required
-                    value={paymentAmount}
-                    onChange={e => setPaymentAmount(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-600 rounded-xl pl-10 pr-4 py-3 text-2xl font-bold text-white outline-none focus:border-emerald-500 transition-colors text-right"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-600 rounded-xl pl-10 pr-4 py-3 text-2xl font-bold text-white outline-none focus:border-blue-500 transition-colors text-right"
                     placeholder="0,00"
                     />
                 </div>
               </div>
-              <div className="flex justify-end gap-3">
+
+              <div className="flex justify-end gap-3 pt-2">
                 <button 
                   type="button" 
-                  onClick={() => setIsPaymentModalOpen(false)}
+                  onClick={() => setActiveModal(null)}
                   className="flex-1 px-4 py-3 text-slate-300 hover:text-white bg-slate-700 rounded-lg font-medium"
                 >
                   İptal
                 </button>
                 <button 
                   type="submit"
-                  className="flex-[2] bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg font-bold shadow-lg shadow-emerald-900/20"
+                  className={`flex-[2] text-white px-4 py-3 rounded-lg font-bold shadow-lg ${activeModal === 'PAYMENT' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'}`}
                 >
-                  Onayla
+                  Kaydet
                 </button>
               </div>
             </form>
