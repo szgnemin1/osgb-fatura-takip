@@ -115,7 +115,10 @@ function createWindow() {
       devTools: true // Geliştirme modunda konsolu açabilmek için
     },
     autoHideMenuBar: true,
-    frame: true
+    frame: true,
+    resizable: true, // Kullanıcı boyutlandırabilir
+    maximizable: true, // Tam ekran yapılabilir
+    fullscreenable: true
   });
 
   const startUrl = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, 'index.html')}`;

@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
 import { Firm, Transaction, TransactionType, InvoiceType } from '../types';
 import { exporter } from '../services/exporter';
-import { FileText, Search, PlusCircle, ArrowDownLeft, ArrowUpRight, Building2, Download, Table, ArrowLeft, Wallet, ChevronRight, MinusCircle } from 'lucide-react';
+import { FileText, Search, PlusCircle, ArrowDownLeft, ArrowUpRight, Building2, Download, Table, ArrowLeft, Wallet, ChevronRight, MinusCircle, Pencil, Trash2 } from 'lucide-react';
 
 const FirmDetails = () => {
   const [firms, setFirms] = useState<Firm[]>([]);
@@ -13,6 +13,7 @@ const FirmDetails = () => {
   
   // Modal States
   const [activeModal, setActiveModal] = useState<'PAYMENT' | 'DEBT' | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null); // Düzenlenen işlem ID
   const [amount, setAmount] = useState('');
   const [transDate, setTransDate] = useState('');
   const [description, setDescription] = useState('');
@@ -31,15 +32,26 @@ const FirmDetails = () => {
     } else {
       setTransactions([]);
     }
-  }, [selectedFirmId, activeModal]);
+  }, [selectedFirmId, activeModal, editingId]); // editingId değişince de yenile (silme sonrası vb)
 
   const filteredFirms = firms.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const openModal = (type: 'PAYMENT' | 'DEBT') => {
+  const openModal = (type: 'PAYMENT' | 'DEBT', transaction?: Transaction) => {
     setActiveModal(type);
-    setAmount('');
-    setTransDate(new Date().toISOString().split('T')[0]); // Bugünün tarihi YYYY-MM-DD
-    setDescription(type === 'PAYMENT' ? 'Tahsilat' : 'Borç Dekontu / Manuel İşlem');
+    
+    if (transaction) {
+        // DÜZENLEME MODU
+        setEditingId(transaction.id);
+        setAmount(transaction.type === TransactionType.INVOICE ? transaction.debt.toString() : transaction.credit.toString());
+        setTransDate(new Date(transaction.date).toISOString().split('T')[0]);
+        setDescription(transaction.description);
+    } else {
+        // YENİ EKLEME MODU
+        setEditingId(null);
+        setAmount('');
+        setTransDate(new Date().toISOString().split('T')[0]); 
+        setDescription(type === 'PAYMENT' ? 'Tahsilat' : 'Borç Dekontu / Manuel İşlem');
+    }
   };
 
   const handleSaveTransaction = (e: React.FormEvent) => {
@@ -47,22 +59,51 @@ const FirmDetails = () => {
     if (!selectedFirmId || !amount || !transDate) return;
 
     const dateObj = new Date(transDate);
+    const numAmount = Number(amount);
 
-    db.addTransaction({
-      firmId: selectedFirmId,
-      date: dateObj.toISOString(),
-      type: activeModal === 'PAYMENT' ? TransactionType.PAYMENT : TransactionType.INVOICE,
-      description: description,
-      debt: activeModal === 'DEBT' ? Number(amount) : 0,
-      credit: activeModal === 'PAYMENT' ? Number(amount) : 0,
-      month: dateObj.getMonth() + 1,
-      year: dateObj.getFullYear(),
-      status: 'APPROVED'
-    });
+    if (editingId) {
+        // GÜNCELLEME
+        const existing = transactions.find(t => t.id === editingId);
+        if (existing) {
+            const updated: Transaction = {
+                ...existing,
+                date: dateObj.toISOString(),
+                description: description,
+                month: dateObj.getMonth() + 1,
+                year: dateObj.getFullYear(),
+                debt: activeModal === 'DEBT' ? numAmount : 0,
+                credit: activeModal === 'PAYMENT' ? numAmount : 0
+            };
+            db.updateTransaction(updated);
+        }
+    } else {
+        // YENİ KAYIT
+        db.addTransaction({
+          firmId: selectedFirmId,
+          date: dateObj.toISOString(),
+          type: activeModal === 'PAYMENT' ? TransactionType.PAYMENT : TransactionType.INVOICE,
+          description: description,
+          debt: activeModal === 'DEBT' ? numAmount : 0,
+          credit: activeModal === 'PAYMENT' ? numAmount : 0,
+          month: dateObj.getMonth() + 1,
+          year: dateObj.getFullYear(),
+          status: 'APPROVED'
+        });
+    }
 
     setActiveModal(null);
+    setEditingId(null);
     setAmount('');
     setDescription('');
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+      if(window.confirm("Bu cari hareketi silmek istediğinize emin misiniz?")) {
+          db.deleteTransaction(id);
+          // State'i güncellemek için editingId trigger'ını kullanabiliriz veya transaction listesini tekrar çekebiliriz
+          // Ancak useEffect dependency array'e transaction değişikliğini eklemedik, manuel filtreleme yapalım:
+          setTransactions(prev => prev.filter(t => t.id !== id));
+      }
   };
 
   const exportSingleFirm = () => {
@@ -219,6 +260,7 @@ const FirmDetails = () => {
                       <th className="p-3 md:p-4 text-slate-400 font-medium text-xs uppercase tracking-wider w-1/2">Açıklama</th>
                       <th className="p-3 md:p-4 text-slate-400 font-medium text-xs uppercase tracking-wider text-right whitespace-nowrap">Borç</th>
                       <th className="p-3 md:p-4 text-slate-400 font-medium text-xs uppercase tracking-wider text-right whitespace-nowrap">Alacak</th>
+                      <th className="p-3 md:p-4 text-center w-20"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-700/50">
@@ -243,6 +285,24 @@ const FirmDetails = () => {
                         </td>
                         <td className="p-3 md:p-4 text-right text-emerald-400 font-medium text-xs md:text-sm whitespace-nowrap bg-emerald-500/0 group-hover:bg-emerald-500/5 transition-colors">
                           {t.credit > 0 ? formatCurrency(t.credit) : '-'}
+                        </td>
+                        <td className="p-3 md:p-4 text-center">
+                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                    onClick={() => openModal(t.type === TransactionType.INVOICE ? 'DEBT' : 'PAYMENT', t)} 
+                                    className="p-1.5 text-blue-400 hover:bg-blue-500/10 rounded" 
+                                    title="Düzenle"
+                                >
+                                    <Pencil className="w-4 h-4"/>
+                                </button>
+                                <button 
+                                    onClick={() => handleDeleteTransaction(t.id)} 
+                                    className="p-1.5 text-rose-400 hover:bg-rose-500/10 rounded" 
+                                    title="Sil"
+                                >
+                                    <Trash2 className="w-4 h-4"/>
+                                </button>
+                            </div>
                         </td>
                       </tr>
                     ))}
@@ -296,7 +356,7 @@ const FirmDetails = () => {
             <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-slate-500 hover:text-white"><ArrowLeft className="w-5 h-5 rotate-180" /></button>
             
             <h3 className={`text-xl font-bold mb-1 ${activeModal === 'PAYMENT' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {activeModal === 'PAYMENT' ? 'Tahsilat Ekle' : 'Borç Ekle'}
+                {editingId ? (activeModal === 'PAYMENT' ? 'Tahsilatı Düzenle' : 'Borcu Düzenle') : (activeModal === 'PAYMENT' ? 'Tahsilat Ekle' : 'Borç Ekle')}
             </h3>
             <p className="text-xs text-slate-400 mb-6">
                 {activeModal === 'PAYMENT' ? 'Kasaya/Bankaya giren tutarı işleyin.' : 'Manuel borç veya açılış bakiyesi ekleyin.'}
@@ -360,7 +420,7 @@ const FirmDetails = () => {
                   type="submit"
                   className={`flex-[2] text-white px-4 py-3 rounded-lg font-bold shadow-lg ${activeModal === 'PAYMENT' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-900/20'}`}
                 >
-                  Kaydet
+                  {editingId ? 'Güncelle' : 'Kaydet'}
                 </button>
               </div>
             </form>

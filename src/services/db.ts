@@ -1,5 +1,4 @@
 
-
 import { Firm, Transaction, TransactionType, PreparationItem, InvoiceType, GlobalSettings, PricingTier } from '../types';
 
 const generateId = () => {
@@ -190,6 +189,16 @@ export const db = {
     return newTransaction;
   },
 
+  // --- YENİ: İŞLEM GÜNCELLEME ---
+  updateTransaction: (transaction: Transaction) => {
+    const transactions = getStorage<Transaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
+    const index = transactions.findIndex(t => t.id === transaction.id);
+    if (index !== -1) {
+        transactions[index] = transaction;
+        setStorage(STORAGE_KEYS.TRANSACTIONS, transactions);
+    }
+  },
+
   updateTransactionStatus: (id: string, status: 'APPROVED' | 'PENDING') => {
     const transactions = getStorage<Transaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
     setStorage(STORAGE_KEYS.TRANSACTIONS, transactions.map(t => t.id === id ? { ...t, status } : t));
@@ -279,7 +288,7 @@ export const db = {
         doctorPercentage: Number(row['Doktor %']) || 40,
         defaultInvoiceType: row['Fatura Tipi'] === 'E-Arşiv' ? InvoiceType.E_ARSIV : InvoiceType.E_FATURA,
         pricingModel: row['Fiyatlandırma Modeli'] || 'STANDART',
-        tolerancePercentage: Number(row['Tolerans Yüzdesi']) || 0,
+        tolerancePercentage: Number(row['Tolerans (%)']) || 0,
         isKdvExcluded: row['Fiyatlar KDV Hariç mi?'] === 'Evet'
       };
       currentFirms.push(newFirm);
@@ -297,7 +306,6 @@ export const db = {
     return { newFirmsCount, newTransCount };
   },
 
-  // --- YENİ: FİYAT GÜNCELLEME (UPDATE IMPORT) ---
   bulkUpdatePricing: (generalData: any[], tierData: any[]) => {
       const currentFirms = getStorage<Firm[]>(STORAGE_KEYS.FIRMS, []);
       let updatedCount = 0;
@@ -342,7 +350,6 @@ export const db = {
 
   clearAllTransactions: () => { setStorage(STORAGE_KEYS.TRANSACTIONS, []); },
 
-  // CLOUD CONFIG
   getCloudUrl: () => {
     return getStorage<string>(STORAGE_KEYS.CLOUD_CONFIG, '');
   },
