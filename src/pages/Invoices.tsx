@@ -44,7 +44,9 @@ const numberToTurkishText = (amount: number): string => {
   return result + "DIR.";
 };
 
-const safeCopyToClipboard = (text: string) => {
+// --- GÜÇLENDİRİLMİŞ KOPYALAMA FONKSİYONU ---
+const safeCopyToClipboard = async (text: string) => {
+    // 1. Electron Ortamı Kontrolü
     if (typeof window !== 'undefined' && (window as any).process && (window as any).process.type === 'renderer') {
         try {
             const { clipboard } = (window as any).require('electron');
@@ -52,7 +54,36 @@ const safeCopyToClipboard = (text: string) => {
             return Promise.resolve();
         } catch (e) { console.error("Electron clipboard hatası:", e); }
     }
-    return navigator.clipboard.writeText(text);
+
+    // 2. Web Ortamı (Fallback Destekli)
+    try {
+        // Modern API (Sadece HTTPS ve Localhost'ta çalışır)
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            // Fallback: HTTP ve Mobil uyumlu eski yöntem
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            
+            // Görünmez yap ama DOM'da tut
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            textArea.style.top = "0";
+            textArea.setAttribute('readonly', '');
+            
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            
+            if (!successful) throw new Error('Fallback copy failed');
+        }
+    } catch (err) {
+        console.error("Kopyalama hatası:", err);
+        // Hata olsa bile kullanıcıya hissettirmemek için sessiz kalabiliriz veya alert verebiliriz
+    }
 };
 
 const CopyBadge = ({ text, label, title, className, valueToCopy }: { text?: string | number, label?: string, title?: string, className?: string, valueToCopy?: string | number }) => {
@@ -69,7 +100,7 @@ const CopyBadge = ({ text, label, title, className, valueToCopy }: { text?: stri
         }
 
         if (!val) return;
-        safeCopyToClipboard(val).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(err => console.error("Kopyalama hatası:", err));
+        safeCopyToClipboard(val).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
     };
     return (
         <button onClick={handleCopy} title={title || "Kopyalamak için tıklayın"} className={`flex items-center gap-1 px-1.5 py-0.5 rounded transition-all duration-300 transform select-none ${copied ? 'bg-emerald-600 text-white scale-105' : 'bg-slate-800 border border-slate-600 text-slate-400 hover:text-white hover:border-blue-500 hover:bg-slate-700'} ${className}`}>
@@ -96,10 +127,8 @@ const SmartCopyButton = ({ inv, globalSettings, allTransactions, firms }: { inv:
     // Toplam Borç = Eski Bakiye + Şu an kesilecek fatura (Metinde görünecek tutar)
     const totalDebt = priorBalance + inv.debt;
 
-    // --- GÖRÜNÜRLÜK KONTROLÜ (DÜZELTİLDİ) ---
-    // Eğer sadeleştirilmiş mod açıksa:
-    // Sadece GEÇMİŞ BAKİYESİ (priorBalance) varsa buton görünsün.
-    // Şu anki faturayı borç sayarak butonu göstermesin.
+    // --- GÖRÜNÜRLÜK KONTROLÜ ---
+    // Sadeleştirilmiş moddaysa ve geçmiş borç yoksa butonu gizle
     if (globalSettings.simpleDebtMode && priorBalance <= 0.1) {
         return null;
     }
@@ -115,14 +144,11 @@ const SmartCopyButton = ({ inv, globalSettings, allTransactions, firms }: { inv:
 
             if (globalSettings.simpleDebtMode) {
                 // MOD 1: SADELEŞTİRİLMİŞ MOD
-                // Sadece borç bilgisi
                 finalStr = `${dateStr} Tarihi itibariyle Toplam Borç Bakiyeniz: ${formattedTotal}'dir. ${bankText}`;
             } else {
                 // MOD 2: STANDART MOD
-                // Fatura tutarı yazı ile + Varsa bakiye notu
                 const textAmount = numberToTurkishText(inv.debt);
                 finalStr = textAmount;
-                
                 if (priorBalance > 0.1) {
                     const branchNote = branches.length > 0 ? ` (Şubeler Dahil)` : '';
                     finalStr += ` "${dateStr} Tarihi itibariyle${branchNote} Borç Bakiyesi: ${formattedTotal}'dir. ${bankText}`;
@@ -163,16 +189,11 @@ const Invoices = () => {
   const [historyEndDate, setHistoryEndDate] = useState('');
 
   const loadData = () => {
-    // 1. Ayarları Güncelle
     setGlobalSettings(db.getGlobalSettings());
-
-    // 2. Verileri Çek
     const allTrans = db.getTransactions();
     setAllTransactions(allTrans);
-    
     const allFirms = db.getFirms();
     setFirms(allFirms);
-    
     const firmMap = new Map<string, Firm>();
     allFirms.forEach(f => firmMap.set(f.id, f));
     
@@ -317,30 +338,30 @@ const Invoices = () => {
                       <button onClick={() => toggleSelect(inv.id)} className="text-slate-500 hover:text-blue-400">{selectedIds.includes(inv.id) ? <CheckSquare className="w-4 h-4 text-blue-500"/> : <Square className="w-4 h-4"/>}</button>
                   </td>
                   <td className="p-3">
-                    <div className="font-medium text-slate-200 text-sm truncate max-w-[250px]" title={inv.firmName}>{inv.firmName}</div>
-                    <div className="flex flex-col gap-0.5 mt-1">
+                    <div className="font-medium text-slate-200 text-sm truncate max-w-[250px] select-text cursor-text" title={inv.firmName}>{inv.firmName}</div>
+                    <div className="flex flex-col gap-0.5 mt-1 select-text">
                         {inv.taxNumber && (
                             <div className="flex items-center gap-1">
                                 <span className="text-[10px] text-slate-500 font-mono">VKN:</span>
-                                <span className="text-[10px] text-slate-400 font-mono">{inv.taxNumber}</span>
+                                <span className="text-[10px] text-slate-400 font-mono select-text cursor-text">{inv.taxNumber}</span>
                                 <CopyBadge text={inv.taxNumber} label="" className="scale-75 origin-left opacity-50 hover:opacity-100" />
                             </div>
                         )}
                         {inv.address && (
                             <div className="flex items-center gap-1">
                                 <span className="text-[10px] text-slate-500 font-mono">ADR:</span>
-                                <span className="text-[10px] text-slate-400 truncate max-w-[200px]" title={inv.address}>{inv.address}</span>
+                                <span className="text-[10px] text-slate-400 truncate max-w-[200px] select-text cursor-text" title={inv.address}>{inv.address}</span>
                                 <CopyBadge text={inv.address} label="" className="scale-75 origin-left opacity-50 hover:opacity-100" />
                             </div>
                         )}
-                        <div className="text-[10px] text-slate-500 truncate max-w-[250px]">{inv.description}</div>
+                        <div className="text-[10px] text-slate-500 truncate max-w-[250px] select-text cursor-text">{inv.description}</div>
                     </div>
                   </td>
                   
                   {/* UZMAN */}
                   <td className="p-3 text-center">
                       <div className="flex flex-col items-center gap-1 bg-slate-800/30 p-1 rounded border border-slate-700/50">
-                          <span className="font-mono text-sm text-slate-300">{formatCurrency(expertVal)}</span>
+                          <span className="font-mono text-sm text-slate-300 select-text cursor-text">{formatCurrency(expertVal)}</span>
                           <div className="flex gap-1">
                               <CopyBadge text={expertVal} label="" />
                               <CopyBadge valueToCopy="İŞ GÜVENLİĞİ UZMANI HİZMET BEDELİ" label="Metin" className="bg-blue-500/10 text-blue-400 border-blue-500/20" />
@@ -351,7 +372,7 @@ const Invoices = () => {
                   {/* HEKİM */}
                   <td className="p-3 text-center">
                       <div className="flex flex-col items-center gap-1 bg-slate-800/30 p-1 rounded border border-slate-700/50">
-                          <span className="font-mono text-sm text-slate-300">{formatCurrency(doctorVal)}</span>
+                          <span className="font-mono text-sm text-slate-300 select-text cursor-text">{formatCurrency(doctorVal)}</span>
                           <div className="flex gap-1">
                               <CopyBadge text={doctorVal} label="" />
                               <CopyBadge valueToCopy="İŞYERİ HEKİMLİĞİ HİZMET BEDELİ" label="Metin" className="bg-purple-500/10 text-purple-400 border-purple-500/20" />
@@ -362,7 +383,7 @@ const Invoices = () => {
                   {/* SAĞLIK */}
                   <td className="p-3 text-center">
                        <div className={`flex flex-col items-center gap-1 p-1 rounded border transition-all duration-500 ${hasHealth ? 'bg-emerald-500/10 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.3)] animate-pulse' : 'bg-slate-800/30 border-slate-700/50'}`}>
-                          <span className={`font-mono text-sm ${hasHealth ? 'font-bold text-emerald-400' : 'text-slate-300'}`}>{formatCurrency(healthVal)}</span>
+                          <span className={`font-mono text-sm select-text cursor-text ${hasHealth ? 'font-bold text-emerald-400' : 'text-slate-300'}`}>{formatCurrency(healthVal)}</span>
                           <div className="flex gap-1">
                               <CopyBadge text={healthVal} label="" />
                               <CopyBadge valueToCopy="SAĞLIK HİZMETİ" label="Metin" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20" />
@@ -372,7 +393,7 @@ const Invoices = () => {
 
                   <td className="p-3 text-right">
                       <div className="flex flex-col items-end gap-1">
-                          <span className="font-bold text-slate-100 text-base">{formatCurrency(inv.debt)}</span>
+                          <span className="font-bold text-slate-100 text-base select-text cursor-text">{formatCurrency(inv.debt)}</span>
                           <CopyBadge text={inv.debt} label="Kop." />
                       </div>
                   </td>
@@ -430,15 +451,15 @@ const Invoices = () => {
                                 {selectedIds.includes(inv.id) ? <CheckSquare className="w-5 h-5 text-blue-500"/> : <Square className="w-5 h-5"/>}
                             </button>
                             <div className="min-w-0">
-                                <h4 className="font-bold text-slate-200 text-sm truncate">{inv.firmName}</h4>
-                                <div className="flex flex-col mt-0.5 gap-1">
+                                <h4 className="font-bold text-slate-200 text-sm truncate select-text">{inv.firmName}</h4>
+                                <div className="flex flex-col mt-0.5 gap-1 select-text">
                                     <div className="flex items-center gap-2">
                                         <InvoiceTypeBadge type={inv.invoiceType} />
-                                        {inv.taxNumber && <span className="text-[10px] text-slate-500 font-mono">{inv.taxNumber}</span>}
+                                        {inv.taxNumber && <span className="text-[10px] text-slate-500 font-mono select-text">{inv.taxNumber}</span>}
                                     </div>
                                     {inv.address && (
                                         <div className="flex items-center gap-1">
-                                            <span className="text-[10px] text-slate-500 truncate max-w-[200px]">{inv.address}</span>
+                                            <span className="text-[10px] text-slate-500 truncate max-w-[200px] select-text">{inv.address}</span>
                                             <CopyBadge text={inv.address} label="" className="scale-75" />
                                         </div>
                                     )}
@@ -446,7 +467,7 @@ const Invoices = () => {
                             </div>
                         </div>
                         <div className="text-right">
-                             <div className="text-base font-bold text-white">{formatCurrency(inv.debt)}</div>
+                             <div className="text-base font-bold text-white select-text">{formatCurrency(inv.debt)}</div>
                         </div>
                     </div>
 
@@ -454,7 +475,7 @@ const Invoices = () => {
                     <div className="grid grid-cols-3 gap-1 mb-3">
                         <div className="flex flex-col items-center bg-slate-900/50 p-1.5 rounded border border-slate-700/30">
                             <span className="text-[9px] text-slate-500 uppercase">Uzman</span>
-                            <span className="text-xs font-medium text-slate-300">{formatCurrency(expertVal)}</span>
+                            <span className="text-xs font-medium text-slate-300 select-text">{formatCurrency(expertVal)}</span>
                             <div className="flex gap-1 mt-1">
                                 <CopyBadge text={expertVal} label="" className="scale-75" />
                                 <CopyBadge valueToCopy="İŞ GÜVENLİĞİ UZMANI HİZMET BEDELİ" label="M" className="scale-75 bg-blue-500/20 text-blue-400" />
@@ -462,7 +483,7 @@ const Invoices = () => {
                         </div>
                         <div className="flex flex-col items-center bg-slate-900/50 p-1.5 rounded border border-slate-700/30">
                             <span className="text-[9px] text-slate-500 uppercase">Hekim</span>
-                            <span className="text-xs font-medium text-slate-300">{formatCurrency(doctorVal)}</span>
+                            <span className="text-xs font-medium text-slate-300 select-text">{formatCurrency(doctorVal)}</span>
                             <div className="flex gap-1 mt-1">
                                 <CopyBadge text={doctorVal} label="" className="scale-75" />
                                 <CopyBadge valueToCopy="İŞYERİ HEKİMLİĞİ HİZMET BEDELİ" label="M" className="scale-75 bg-purple-500/20 text-purple-400" />
@@ -470,7 +491,7 @@ const Invoices = () => {
                         </div>
                         <div className={`flex flex-col items-center p-1.5 rounded border transition-all duration-500 ${hasHealth ? 'bg-emerald-500/10 border-emerald-500/50 animate-pulse' : 'bg-slate-900/50 border-slate-700/30'}`}>
                             <span className="text-[9px] text-slate-500 uppercase">Sağlık</span>
-                            <span className={`text-xs font-medium ${hasHealth ? 'text-emerald-400 font-bold' : 'text-slate-300'}`}>{formatCurrency(healthVal)}</span>
+                            <span className={`text-xs font-medium select-text ${hasHealth ? 'text-emerald-400 font-bold' : 'text-slate-300'}`}>{formatCurrency(healthVal)}</span>
                             <div className="flex gap-1 mt-1">
                                 <CopyBadge text={healthVal} label="" className="scale-75" />
                                 <CopyBadge valueToCopy="SAĞLIK HİZMETİ" label="M" className="scale-75 bg-emerald-500/20 text-emerald-400" />
