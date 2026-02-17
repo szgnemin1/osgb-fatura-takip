@@ -2,19 +2,17 @@
 const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { autoUpdater } = require('electron-updater');
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const { autoUpdater } = require('electron-updater');
+const ip = require('ip');
 
-// Pencere referansını global tutuyoruz ki API içinden erişebilelim
+// Pencere referansını global tutuyoruz
 let mainWindow;
+const PORT = 5000;
 
-// --- SERVER AYARLARI (Telefondan Erişim İçin) ---
-const SERVER_PORT = 5000;
-const serverApp = express();
-
-// --- TEK GERÇEK KAYNAK: Veritabanı Yolu ---
+// --- VERİTABANI YOLU ---
 const getDbPath = () => {
     const APPDATA = process.env.APPDATA || (process.platform === 'darwin' ? process.env.HOME + '/Library/Preferences' : process.env.HOME + "/.local/share");
     const dir = path.join(APPDATA, 'OSGB Fatura Takip');
@@ -28,74 +26,66 @@ const getDbPath = () => {
 
 const dbPath = getDbPath();
 
-const log = (msg) => {
-    const time = new Date().toLocaleTimeString();
-    console.log(`[${time}] ${msg}`);
-};
+// --------------------------------------------------
+// EXPRESS SERVER (YEREL AĞ PAYLAŞIMI İÇİN)
+// --------------------------------------------------
+const server = express();
+server.use(cors());
+server.use(bodyParser.json({ limit: '50mb' }));
 
-// Middleware
-serverApp.use(cors());
-serverApp.use(bodyParser.json({ limit: '50mb' }));
-
-// 1. Statik Dosyaları Sun
-const buildPath = app.isPackaged 
-    ? path.join(__dirname) 
-    : path.join(__dirname, '../build');
-
+// 1. Statik Dosyaları Sun (React Build Dosyaları)
+// Eğer build klasörü varsa oradan sunar, yoksa public'ten (Dev modunda API çalışır, UI React server'dan gelir)
+const buildPath = path.join(__dirname, '..', 'build');
 if (fs.existsSync(buildPath)) {
-    serverApp.use(express.static(buildPath));
+    server.use(express.static(buildPath));
 }
 
 // 2. API: Veritabanını Oku (GET)
-serverApp.get('/api/db', (req, res) => {
-  if (fs.existsSync(dbPath)) {
+server.get('/api/data', (req, res) => {
+    if (fs.existsSync(dbPath)) {
+        try {
+            const data = fs.readFileSync(dbPath, 'utf-8');
+            res.json(JSON.parse(data));
+        } catch (e) {
+            res.status(500).json({ error: 'Veritabanı okunamadı' });
+        }
+    } else {
+        res.json({}); // Boş DB
+    }
+});
+
+// 3. API: Veritabanını Yaz (POST)
+server.post('/api/save', (req, res) => {
     try {
-      const data = fs.readFileSync(dbPath, 'utf-8');
-      res.json(data ? JSON.parse(data) : {});
+        const newData = req.body;
+        // Mevcut veriyi oku (Güvenlik için yedekleme yapılabilir)
+        fs.writeFileSync(dbPath, JSON.stringify(newData, null, 2));
+        
+        // Ana pencereye haber ver (UI güncellensin)
+        if (mainWindow) {
+            mainWindow.webContents.send('external-update');
+        }
+        
+        res.json({ success: true });
     } catch (e) {
-      res.json({}); 
+        console.error(e);
+        res.status(500).json({ error: 'Kayıt başarısız' });
     }
-  } else {
-    res.json({}); 
-  }
 });
 
-// 3. API: Veritabanını Güncelle (POST) - KRİTİK GÜNCELLEME
-serverApp.post('/api/db', (req, res) => {
-  try {
-    const data = req.body;
-    // 1. Dosyaya Yaz
-    fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
-    
-    // 2. Masaüstü Uygulamasına Haber Ver (Canlı Senkronizasyon)
-    if (mainWindow) {
-        mainWindow.webContents.send('external-data-update');
+// 4. React App Fallback (SPA için her isteği index.html'e yönlendir)
+server.get('*', (req, res) => {
+    if (fs.existsSync(path.join(buildPath, 'index.html'))) {
+        res.sendFile(path.join(buildPath, 'index.html'));
+    } else {
+        res.send('OSGB Pro Server Çalışıyor. UI için uygulamayı build ediniz.');
     }
-
-    res.json({ success: true });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Veritabanı yazılamadı' });
-  }
-});
-
-// React Router Yönlendirmesi
-serverApp.get('*', (req, res) => {
-  if (fs.existsSync(path.join(buildPath, 'index.html'))) {
-      res.sendFile(path.join(buildPath, 'index.html'));
-  } else {
-      res.send(`<h1>Sistem Başlatılıyor...</h1>`);
-  }
 });
 
 // Sunucuyu Başlat
-let server;
-const startServer = () => {
-    server = serverApp.listen(SERVER_PORT, '0.0.0.0', () => {
-        console.log(`\n✅ SUNUCU AKTİF: http://localhost:${SERVER_PORT}`);
-        console.log(`📂 VERİTABANI: ${dbPath}\n`);
-    });
-}
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`OSGB Sunucusu Başlatıldı: http://${ip.address()}:${PORT}`);
+});
 
 // --------------------------------------------------
 // ELECTRON PENCERE YÖNETİMİ
@@ -104,26 +94,31 @@ const startServer = () => {
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
-    height: 850,
-    minWidth: 800,
-    minHeight: 600,
+    height: 800,
+    minWidth: 1024,
+    minHeight: 720,
     title: "OSGB Fatura Takip",
     icon: path.join(__dirname, 'favicon.ico'),
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      devTools: true // Geliştirme modunda konsolu açabilmek için
+      devTools: true,
+      webSecurity: false // Yerel fetch istekleri için
     },
     autoHideMenuBar: true,
     frame: true,
-    resizable: true, // Kullanıcı boyutlandırabilir
-    maximizable: true, // Tam ekran yapılabilir
-    fullscreenable: true
+    show: false // Hazır olunca göster (Beyaz ekranı engeller)
   });
 
   const startUrl = process.env.ELECTRON_START_URL || `file://${path.join(__dirname, 'index.html')}`;
   
   mainWindow.loadURL(startUrl);
+
+  // Pencere tamamen yüklendiğinde göster
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    if (app.isPackaged) autoUpdater.checkForUpdatesAndNotify();
+  });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https:') || url.startsWith('http:')) {
@@ -131,10 +126,6 @@ function createWindow() {
       return { action: 'deny' };
     }
     return { action: 'allow' };
-  });
-
-  mainWindow.once('ready-to-show', () => {
-    if (app.isPackaged) autoUpdater.checkForUpdatesAndNotify();
   });
 
   mainWindow.on('closed', () => {
@@ -145,6 +136,11 @@ function createWindow() {
   autoUpdater.on('update-downloaded', () => mainWindow.webContents.send('update_downloaded'));
 }
 
+// IPC: Renderer process IP adresini istediginde
+ipcMain.on('get-local-ip', (event) => {
+    event.returnValue = ip.address();
+});
+
 ipcMain.on('get-db-path', (event) => {
     event.returnValue = dbPath; 
 });
@@ -152,13 +148,11 @@ ipcMain.on('get-db-path', (event) => {
 ipcMain.on('restart_app', () => autoUpdater.quitAndInstall());
 
 app.whenReady().then(() => {
-    startServer();
     createWindow();
 });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    if (server) server.close(); 
     app.quit();
   }
 });

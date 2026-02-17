@@ -1,7 +1,7 @@
 
 {
   "name": "osgb-fatura-takip",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "homepage": "./",
   "main": "public/electron.js",
@@ -26,6 +26,7 @@
     "cors": "^2.8.5",
     "electron-updater": "^6.1.7",
     "express": "^4.18.2",
+    "ip": "^1.1.8",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.8.1",
     "lucide-react": "^0.294.0",

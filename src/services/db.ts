@@ -1,5 +1,5 @@
 
-import { Firm, Transaction, TransactionType, PreparationItem, InvoiceType, GlobalSettings, PricingTier } from '../types';
+import { Firm, Transaction, TransactionType, PreparationItem, InvoiceType, GlobalSettings, PricingTier, ExpenseCategory, Expense } from '../types';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -11,13 +11,17 @@ const STORAGE_KEYS = {
   PREPARATION: 'osgb_preparation',
   GLOBAL_SETTINGS: 'osgb_global_settings',
   LOGS: 'osgb_logs',
-  CLOUD_CONFIG: 'osgb_cloud_config'
+  CLOUD_CONFIG: 'osgb_cloud_config',
+  EXPENSE_CATEGORIES: 'osgb_expense_categories',
+  EXPENSES: 'osgb_expenses'
 };
 
 let fs: any;
 let dbFilePath: string = '';
+let ipcRenderer: any;
+
+// ORTAM KONTROLÜ: Electron mu yoksa Tarayıcı mı?
 const isElectron = typeof window !== 'undefined' && (window as any).process && (window as any).process.type === 'renderer';
-const isBrowserClient = !isElectron; 
 
 // --- VERİ ÇAKIŞMA KİLİDİ ---
 let isWritingToDisk = false;
@@ -26,44 +30,29 @@ let listeners: Listener[] = [];
 
 const notifyListeners = () => { listeners.forEach(l => l()); };
 
-// API URL
-const getApiUrl = () => {
-    const port = window.location.port;
-    if (port === '3000') return `${window.location.protocol}//${window.location.hostname}:5000/api/db`;
-    return `/api/db`;
-};
-
 // --- MASAÜSTÜ ENTEGRASYONU ---
 if (isElectron) {
   try {
     const requireFunc = (window as any).require;
     fs = requireFunc('fs');
-    const { ipcRenderer } = requireFunc('electron');
+    ipcRenderer = requireFunc('electron').ipcRenderer;
     dbFilePath = ipcRenderer.sendSync('get-db-path');
     
-    ipcRenderer.on('external-data-update', () => {
+    // Dışarıdan (Mobil vb.) güncelleme gelirse UI'ı yenile
+    ipcRenderer.on('external-update', () => {
         db.initData(true).then(() => notifyListeners());
     });
-
-    setInterval(() => {
-        if (!isWritingToDisk) {
-            db.initData(false).then((changed) => { if(changed) notifyListeners(); });
-        }
-    }, 3000);
   } catch (e) { console.error("Electron modülleri yüklenemedi:", e); }
 }
 
-if (isBrowserClient) {
-    setInterval(async () => {
-        if (isWritingToDisk) return;
-        const changed = await db.initData(false);
-        if (changed) notifyListeners();
-    }, 2000); 
-}
+// SERVER API URL (Tarayıcı modu için)
+// Tarayıcıda çalışırken, sayfanın sunulduğu adresi (örn: 192.168.1.20:5000) baz alır.
+const API_URL = isElectron ? 'http://localhost:5000' : ''; 
 
-// Diske Yazma
+// Diske Yazma / Sunucuya Gönderme (Debounced)
 let saveTimeout: any = null;
-const persistData = (sync: boolean = false) => {
+
+const persistData = async () => {
     isWritingToDisk = true;
     const fullData: any = {};
     Object.values(STORAGE_KEYS).forEach(k => {
@@ -72,30 +61,32 @@ const persistData = (sync: boolean = false) => {
     });
 
     if (isElectron && fs && dbFilePath) {
+        // ELECTRON: Direkt dosyaya yaz
         try {
-            if (sync) {
-                fs.writeFileSync(dbFilePath, JSON.stringify(fullData, null, 2));
-                setTimeout(() => { isWritingToDisk = false; }, 500);
-            } else {
-                fs.writeFile(dbFilePath, JSON.stringify(fullData, null, 2), (err: any) => {
-                    setTimeout(() => { isWritingToDisk = false; }, 500);
-                });
-            }
+            fs.writeFile(dbFilePath, JSON.stringify(fullData, null, 2), (err: any) => {
+                setTimeout(() => { isWritingToDisk = false; }, 200);
+            });
         } catch(e) { isWritingToDisk = false; }
-    } else if (isBrowserClient) {
-        fetch(getApiUrl(), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(fullData),
-            keepalive: true 
-        }).finally(() => { setTimeout(() => { isWritingToDisk = false; }, 500); });
+    } else {
+        // BROWSER: API'ye gönder
+        try {
+            await fetch('/api/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(fullData)
+            });
+            isWritingToDisk = false;
+        } catch (e) {
+            console.error("Sunucuya kayıt hatası:", e);
+            isWritingToDisk = false;
+        }
     }
 };
 
 const debounceSaveToDisk = () => {
     isWritingToDisk = true;
     if (saveTimeout) clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => { persistData(false); }, 500);
+    saveTimeout = setTimeout(() => { persistData(); }, 500);
 };
 
 const getStorage = <T>(key: string, defaultValue: T): T => {
@@ -118,43 +109,43 @@ export const db = {
       return () => { listeners = listeners.filter(l => l !== listener); };
   },
 
-  initData: async (forceReadDisk = false): Promise<boolean> => {
-    if (isWritingToDisk && !forceReadDisk) return false;
-    let hasChanged = false;
-    if (isElectron && fs && dbFilePath) {
-        if (fs.existsSync(dbFilePath)) {
-            try {
-                const rawData = fs.readFileSync(dbFilePath, 'utf-8');
-                const parsedData = JSON.parse(rawData);
-                const currentStr = JSON.stringify({ firms: localStorage.getItem(STORAGE_KEYS.FIRMS) });
-                const newStr = JSON.stringify({ firms: parsedData[STORAGE_KEYS.FIRMS] });
+  // VERİTABANI BAŞLATMA (Hem Desktop Hem Mobile Uyumlu)
+  initData: async (forceSync = false): Promise<boolean> => {
+    try {
+        let parsedData: any = null;
 
-                if (currentStr !== newStr || forceReadDisk) {
-                    if (Object.keys(parsedData).length > 0) {
-                        Object.keys(parsedData).forEach(key => { if(parsedData[key]) localStorage.setItem(key, parsedData[key]); });
-                        hasChanged = true;
-                    }
-                } else if (!forceReadDisk && Object.keys(parsedData).length === 0) { persistData(true); }
-            } catch (e) {}
-        } else { persistData(true); }
-    } else if (isBrowserClient) {
-        try {
-            const res = await fetch(getApiUrl());
-            if (res.ok) {
-                const remoteData = await res.json();
-                const currentStr = JSON.stringify({ firms: localStorage.getItem(STORAGE_KEYS.FIRMS) });
-                const newStr = JSON.stringify({ firms: remoteData[STORAGE_KEYS.FIRMS] });
-                if (currentStr !== newStr && Object.keys(remoteData).length > 0) {
-                    Object.keys(remoteData).forEach(key => { if(remoteData[key]) localStorage.setItem(key, remoteData[key]); });
-                    hasChanged = true;
-                }
+        if (isElectron && fs && dbFilePath) {
+            // ELECTRON: Diskten Oku
+            if (fs.existsSync(dbFilePath)) {
+                const rawData = fs.readFileSync(dbFilePath, 'utf-8');
+                parsedData = JSON.parse(rawData);
+            } else {
+                persistData(); // Dosya yoksa oluştur
+                return true;
             }
-        } catch (e) {}
+        } else {
+            // BROWSER: Sunucudan Çek
+            const response = await fetch('/api/data');
+            if (response.ok) {
+                parsedData = await response.json();
+            }
+        }
+
+        // LocalStorage'ı güncelle
+        if (parsedData && Object.keys(parsedData).length > 0) {
+            Object.keys(parsedData).forEach(key => { 
+                if(parsedData[key]) localStorage.setItem(key, parsedData[key]); 
+            });
+            notifyListeners();
+            return true;
+        }
+    } catch (e) { 
+        console.error("DB Başlatma Hatası", e);
     }
-    return hasChanged;
+    return false;
   },
 
-  forceSync: () => { persistData(true); notifyListeners(); },
+  forceSync: () => { persistData(); notifyListeners(); },
 
   getFirms: (): Firm[] => getStorage<Firm[]>(STORAGE_KEYS.FIRMS, []).sort((a, b) => a.name.localeCompare(b.name)),
   
@@ -189,7 +180,6 @@ export const db = {
     return newTransaction;
   },
 
-  // --- YENİ: İŞLEM GÜNCELLEME ---
   updateTransaction: (transaction: Transaction) => {
     const transactions = getStorage<Transaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
     const index = transactions.findIndex(t => t.id === transaction.id);
@@ -214,6 +204,35 @@ export const db = {
     setStorage(STORAGE_KEYS.TRANSACTIONS, transactions.filter(t => !ids.includes(t.id)));
   },
 
+  // --- GİDER YÖNETİMİ ---
+  getExpenseCategories: (): ExpenseCategory[] => getStorage<ExpenseCategory[]>(STORAGE_KEYS.EXPENSE_CATEGORIES, []),
+  
+  addExpenseCategory: (name: string) => {
+    const cats = getStorage<ExpenseCategory[]>(STORAGE_KEYS.EXPENSE_CATEGORIES, []);
+    const newCat = { id: generateId(), name };
+    setStorage(STORAGE_KEYS.EXPENSE_CATEGORIES, [...cats, newCat]);
+    return newCat;
+  },
+
+  deleteExpenseCategory: (id: string) => {
+    const cats = getStorage<ExpenseCategory[]>(STORAGE_KEYS.EXPENSE_CATEGORIES, []);
+    setStorage(STORAGE_KEYS.EXPENSE_CATEGORIES, cats.filter(c => c.id !== id));
+  },
+
+  getExpenses: (): Expense[] => getStorage<Expense[]>(STORAGE_KEYS.EXPENSES, []),
+
+  addExpense: (expense: Omit<Expense, 'id'>) => {
+    const expenses = getStorage<Expense[]>(STORAGE_KEYS.EXPENSES, []);
+    const newExpense = { ...expense, id: generateId() };
+    setStorage(STORAGE_KEYS.EXPENSES, [...expenses, newExpense]);
+    return newExpense;
+  },
+
+  deleteExpense: (id: string) => {
+    const expenses = getStorage<Expense[]>(STORAGE_KEYS.EXPENSES, []);
+    setStorage(STORAGE_KEYS.EXPENSES, expenses.filter(e => e.id !== id));
+  },
+
   getPreparationItems: (): PreparationItem[] => getStorage<PreparationItem[]>(STORAGE_KEYS.PREPARATION, []),
   
   savePreparationItems: (items: PreparationItem[]) => { setStorage(STORAGE_KEYS.PREPARATION, items); },
@@ -226,7 +245,14 @@ export const db = {
   },
 
   getGlobalSettings: (): GlobalSettings => getStorage<GlobalSettings>(STORAGE_KEYS.GLOBAL_SETTINGS, {
-      expertPercentage: 60, doctorPercentage: 40, vatRateExpert: 20, vatRateDoctor: 10, vatRateHealth: 10, reportEmail: '', bankInfo: ''
+      expertPercentage: 60, 
+      doctorPercentage: 40, 
+      vatRateExpert: 20, 
+      vatRateDoctor: 10, 
+      vatRateHealth: 10, 
+      reportEmail: '', 
+      bankInfo: '',
+      simpleDebtMode: false // Varsayılan kapalı
   }),
 
   saveGlobalSettings: (settings: GlobalSettings) => { setStorage(STORAGE_KEYS.GLOBAL_SETTINGS, settings); },
@@ -236,8 +262,10 @@ export const db = {
       transactions: getStorage(STORAGE_KEYS.TRANSACTIONS, []),
       preparation: getStorage(STORAGE_KEYS.PREPARATION, []),
       globalSettings: getStorage(STORAGE_KEYS.GLOBAL_SETTINGS, {}),
+      expenseCategories: getStorage(STORAGE_KEYS.EXPENSE_CATEGORIES, []),
+      expenses: getStorage(STORAGE_KEYS.EXPENSES, []),
       backupDate: new Date().toISOString(),
-      version: '2.1.0'
+      version: '2.2.0'
   }),
 
   restoreBackup: (data: any) => {
@@ -246,25 +274,20 @@ export const db = {
       if (data.transactions) setStorage(STORAGE_KEYS.TRANSACTIONS, data.transactions);
       if (data.preparation) setStorage(STORAGE_KEYS.PREPARATION, data.preparation);
       if (data.globalSettings) setStorage(STORAGE_KEYS.GLOBAL_SETTINGS, data.globalSettings);
-      persistData(true); 
+      if (data.expenseCategories) setStorage(STORAGE_KEYS.EXPENSE_CATEGORIES, data.expenseCategories);
+      if (data.expenses) setStorage(STORAGE_KEYS.EXPENSES, data.expenses);
+      persistData(); 
       return true;
     } catch (e) { return false; }
   },
 
-  getDbPath: () => isElectron ? dbFilePath : `Uzak Sunucu: ${window.location.hostname}`,
+  getDbPath: () => dbFilePath,
   
   getLocalIpAddress: () => {
-      if (!isElectron) return "Tarayıcı";
-      try {
-          const os = (window as any).require('os');
-          const interfaces = os.networkInterfaces();
-          for (const name of Object.keys(interfaces)) {
-              for (const iface of interfaces[name]) {
-                  if (iface.family === 'IPv4' && !iface.internal) return iface.address;
-              }
-          }
-          return "IP Yok";
-      } catch (e) { return "Hata"; }
+      if(isElectron && ipcRenderer) {
+          return ipcRenderer.sendSync('get-local-ip');
+      }
+      return 'localhost';
   },
 
   bulkImportFirms: (data: any[]) => {
@@ -345,6 +368,7 @@ export const db = {
   factoryReset: () => {
       localStorage.clear();
       if (isElectron && fs && dbFilePath) { try { fs.writeFileSync(dbFilePath, JSON.stringify({}, null, 2)); } catch (e) {} }
+      // Browser modunda sunucuya da temizlik isteği atılabilir ama şimdilik manuel sync yeterli
       notifyListeners();
   },
 

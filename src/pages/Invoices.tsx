@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { db } from '../services/db';
-import { Transaction, TransactionType, InvoiceType, Firm, ServiceType } from '../types';
+import { Transaction, TransactionType, InvoiceType, Firm, ServiceType, GlobalSettings } from '../types';
 import { exporter } from '../services/exporter';
 import { Receipt, CheckCircle, Trash2, History, FileDown, FileSpreadsheet, Copy, ClipboardCopy, Filter, CheckSquare, Square, Check, FileCheck, DollarSign, Calendar, XCircle, AlertCircle } from 'lucide-react';
 
@@ -61,8 +61,13 @@ const CopyBadge = ({ text, label, title, className, valueToCopy }: { text?: stri
         e.stopPropagation(); window.focus();
         const content = valueToCopy !== undefined ? valueToCopy : text;
         let val = "";
-        if (typeof content === 'number') { val = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(content); } 
-        else { val = String(content || ""); }
+        
+        if (typeof content === 'number') { 
+            val = content.toFixed(2); 
+        } else { 
+            val = String(content || ""); 
+        }
+
         if (!val) return;
         safeCopyToClipboard(val).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(err => console.error("Kopyalama hatası:", err));
     };
@@ -74,34 +79,62 @@ const CopyBadge = ({ text, label, title, className, valueToCopy }: { text?: stri
     );
 };
 
-const SmartCopyButton = ({ inv, globalSettings, allTransactions, firms }: { inv: Transaction, globalSettings: any, allTransactions: Transaction[], firms: Firm[] }) => {
+const SmartCopyButton = ({ inv, globalSettings, allTransactions, firms }: { inv: Transaction, globalSettings: GlobalSettings, allTransactions: Transaction[], firms: Firm[] }) => {
     const [copied, setCopied] = useState(false);
+    
+    // --- HESAPLAMA ---
+    const targetIds = [inv.firmId];
+    const branches = firms.filter(f => f.parentFirmId === inv.firmId);
+    branches.forEach(b => targetIds.push(b.id));
+    
+    // Sadece ONAYLI işlemleri ve bu fatura öncesi durumu topla (Geçmiş Bakiyeyi Bul)
+    const firmTrans = allTransactions.filter(t => targetIds.includes(t.firmId) && (t.status === 'APPROVED' || !t.status));
+    const totalDebited = firmTrans.reduce((sum, t) => sum + t.debt, 0);
+    const totalPaid = firmTrans.reduce((sum, t) => sum + t.credit, 0);
+    const priorBalance = totalDebited - totalPaid;
+    
+    // Toplam Borç = Eski Bakiye + Şu an kesilecek fatura (Metinde görünecek tutar)
+    const totalDebt = priorBalance + inv.debt;
+
+    // --- GÖRÜNÜRLÜK KONTROLÜ (DÜZELTİLDİ) ---
+    // Eğer sadeleştirilmiş mod açıksa:
+    // Sadece GEÇMİŞ BAKİYESİ (priorBalance) varsa buton görünsün.
+    // Şu anki faturayı borç sayarak butonu göstermesin.
+    if (globalSettings.simpleDebtMode && priorBalance <= 0.1) {
+        return null;
+    }
+
     const handleSmartTextCopy = (e: React.MouseEvent) => {
         e.stopPropagation(); window.focus();
         try {
-            const textAmount = numberToTurkishText(inv.debt);
-            const targetIds = [inv.firmId];
-            const branches = firms.filter(f => f.parentFirmId === inv.firmId);
-            branches.forEach(b => targetIds.push(b.id));
-            const firmTrans = allTransactions.filter(t => targetIds.includes(t.firmId) && (t.status === 'APPROVED' || !t.status));
-            const totalDebited = firmTrans.reduce((sum, t) => sum + t.debt, 0);
-            const totalPaid = firmTrans.reduce((sum, t) => sum + t.credit, 0);
-            const priorBalance = totalDebited - totalPaid;
+            const dateStr = new Date().toLocaleDateString('tr-TR');
+            const bankText = globalSettings.bankInfo || '';
+            const formattedTotal = totalDebt.toFixed(2) + ' TL'; 
+            
+            let finalStr = "";
 
-            let finalStr = textAmount;
-            if (priorBalance > 0.1) {
-                const totalDebt = priorBalance + inv.debt;
-                const dateStr = new Date().toLocaleDateString('tr-TR');
-                const formattedTotal = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(totalDebt);
-                const bankText = globalSettings.bankInfo || '';
-                const branchNote = branches.length > 0 ? ` (Şubeler Dahil)` : '';
-                finalStr += ` "${dateStr} Tarihi itibariyle${branchNote} Borç Bakiyesi: ${formattedTotal}'dir. ${bankText}`;
+            if (globalSettings.simpleDebtMode) {
+                // MOD 1: SADELEŞTİRİLMİŞ MOD
+                // Sadece borç bilgisi
+                finalStr = `${dateStr} Tarihi itibariyle Toplam Borç Bakiyeniz: ${formattedTotal}'dir. ${bankText}`;
+            } else {
+                // MOD 2: STANDART MOD
+                // Fatura tutarı yazı ile + Varsa bakiye notu
+                const textAmount = numberToTurkishText(inv.debt);
+                finalStr = textAmount;
+                
+                if (priorBalance > 0.1) {
+                    const branchNote = branches.length > 0 ? ` (Şubeler Dahil)` : '';
+                    finalStr += ` "${dateStr} Tarihi itibariyle${branchNote} Borç Bakiyesi: ${formattedTotal}'dir. ${bankText}`;
+                }
             }
+
             safeCopyToClipboard(finalStr).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
         } catch (e) { console.error(e); }
     };
+
     return (
-        <button onClick={handleSmartTextCopy} className={`p-1.5 rounded-lg transition-all duration-300 border flex items-center justify-center ${copied ? 'bg-emerald-600 text-white border-emerald-500 scale-105' : 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:opacity-80'}`} title="Yazı ile Kopyala (Şubeler Dahil)">
+        <button onClick={handleSmartTextCopy} className={`p-1.5 rounded-lg transition-all duration-300 border flex items-center justify-center ${copied ? 'bg-emerald-600 text-white border-emerald-500 scale-105' : 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:opacity-80'}`} title="Bakiyeyi Kopyala">
             {copied ? <Check className="w-4 h-4 animate-in zoom-in" /> : <ClipboardCopy className="w-4 h-4" />}
         </button>
     );
@@ -126,24 +159,30 @@ const Invoices = () => {
   const [filterType, setFilterType] = useState<'ALL' | InvoiceType>('ALL');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
-  // GEÇMİŞ FİLTRELEME STATE'LERİ
   const [historyStartDate, setHistoryStartDate] = useState('');
   const [historyEndDate, setHistoryEndDate] = useState('');
 
   const loadData = () => {
+    // 1. Ayarları Güncelle
+    setGlobalSettings(db.getGlobalSettings());
+
+    // 2. Verileri Çek
     const allTrans = db.getTransactions();
     setAllTransactions(allTrans);
+    
     const allFirms = db.getFirms();
     setFirms(allFirms);
+    
     const firmMap = new Map<string, Firm>();
     allFirms.forEach(f => firmMap.set(f.id, f));
+    
     const allInvoices = allTrans.filter(t => t.type === TransactionType.INVOICE).map(t => {
         const firm = firmMap.get(t.firmId);
         return { ...t, firmName: firm?.name || 'Bilinmeyen Firma', taxNumber: firm?.taxNumber || '', address: firm?.address || '' };
     });
+    
     setPendingInvoices(allInvoices.filter(t => t.status === 'PENDING').sort((a, b) => a.firmName.localeCompare(b.firmName)));
     setApprovedInvoices(allInvoices.filter(t => t.status === 'APPROVED').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    setGlobalSettings(db.getGlobalSettings());
     setSelectedIds([]);
   };
 
@@ -174,7 +213,10 @@ const Invoices = () => {
   const toggleSelectAll = () => { if (selectedIds.length === filteredPending.length) setSelectedIds([]); else setSelectedIds(filteredPending.map(inv => inv.id)); };
   const toggleSelect = (id: string) => { if (selectedIds.includes(id)) setSelectedIds(selectedIds.filter(s => s !== id)); else setSelectedIds([...selectedIds, id]); };
   const handleBulkDelete = () => { window.focus(); if (selectedIds.length === 0) return; if (window.confirm(`${selectedIds.length} adet faturayı silmek istediğinize emin misiniz?`)) { db.deleteTransactionsBulk(selectedIds); } };
-  const formatCurrency = (val: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 2 }).format(val);
+  
+  const formatCurrency = (val: number) => {
+      return val.toFixed(2) + ' ₺';
+  };
 
   return (
     <div className="flex flex-col h-[calc(100vh-2rem)] space-y-4 animate-in fade-in duration-500">
@@ -240,34 +282,26 @@ const Invoices = () => {
             </thead>
             <tbody className="divide-y divide-slate-700/50">
               {filteredPending.map(inv => {
-                // --- ONARILAN HESAPLAMA MANTIĞI ---
                 const firm = firms.find(f => f.id === inv.firmId);
                 let expertVal = inv.calculatedDetails?.expertShare || 0;
                 let doctorVal = inv.calculatedDetails?.doctorShare || 0;
                 let healthVal = inv.calculatedDetails?.extraItemAmount || 0;
 
-                // Eğer eski bir kayıt ise ve detaylar saklanmamışsa, anlık hesapla
-                // Bu durumda NET değeri bulmak için KDV'yi düşmemiz gerekir.
                 if (expertVal === 0 && doctorVal === 0 && firm) {
                     let eRate = firm.expertPercentage;
                     let dRate = firm.doctorPercentage;
                     
-                    // Hizmet Türü Kontrolü (ORANLARI %100 YAPARAK TAMAMLAMA)
                     if (firm.serviceType === ServiceType.EXPERT_ONLY) { dRate = 0; eRate = 100; }
                     if (firm.serviceType === ServiceType.DOCTOR_ONLY) { eRate = 0; dRate = 100; }
 
-                    // KDV ORANLARI
                     const vatExpert = globalSettings?.vatRateExpert ?? 20;
                     const vatDoctor = globalSettings?.vatRateDoctor ?? 20;
 
-                    // NET HESAPLAMA (Tutar İçinden KDV Düşülür)
-                    // Örn: Toplam Borç (Gross) 1200 TL ise, Net Hakediş 1000 TL olmalıdır.
                     if (firm.serviceType === ServiceType.EXPERT_ONLY) {
                         expertVal = inv.debt / (1 + vatExpert / 100);
                     } else if (firm.serviceType === ServiceType.DOCTOR_ONLY) {
                         doctorVal = inv.debt / (1 + vatDoctor / 100);
                     } else {
-                        // Karışık ise önce dağıt, sonra KDV düş (Yaklaşık)
                         const grossExpert = inv.debt * (eRate / 100);
                         const grossDoctor = inv.debt * (dRate / 100);
                         expertVal = grossExpert / (1 + vatExpert / 100);
@@ -292,7 +326,6 @@ const Invoices = () => {
                                 <CopyBadge text={inv.taxNumber} label="" className="scale-75 origin-left opacity-50 hover:opacity-100" />
                             </div>
                         )}
-                        {/* ADRES KOPYALAMA ALANI */}
                         {inv.address && (
                             <div className="flex items-center gap-1">
                                 <span className="text-[10px] text-slate-500 font-mono">ADR:</span>
@@ -326,7 +359,7 @@ const Invoices = () => {
                       </div>
                   </td>
 
-                  {/* SAĞLIK (YANIP SÖNME EFEKTİ) */}
+                  {/* SAĞLIK */}
                   <td className="p-3 text-center">
                        <div className={`flex flex-col items-center gap-1 p-1 rounded border transition-all duration-500 ${hasHealth ? 'bg-emerald-500/10 border-emerald-500/50 shadow-[0_0_10px_rgba(16,185,129,0.3)] animate-pulse' : 'bg-slate-800/30 border-slate-700/50'}`}>
                           <span className={`font-mono text-sm ${hasHealth ? 'font-bold text-emerald-400' : 'text-slate-300'}`}>{formatCurrency(healthVal)}</span>
@@ -364,13 +397,11 @@ const Invoices = () => {
         {/* --- MOBILE CARD VIEW (KART GÖRÜNÜMÜ) --- */}
         <div className="md:hidden flex-1 overflow-y-auto p-2 space-y-2 bg-slate-900/50">
             {filteredPending.map(inv => {
-                // --- ONARILAN HESAPLAMA MANTIĞI (MOBİL İÇİN) ---
                 const firm = firms.find(f => f.id === inv.firmId);
                 let expertVal = inv.calculatedDetails?.expertShare || 0;
                 let doctorVal = inv.calculatedDetails?.doctorShare || 0;
                 let healthVal = inv.calculatedDetails?.extraItemAmount || 0;
 
-                // Anlık hesaplama (Veri yoksa)
                 if (expertVal === 0 && doctorVal === 0 && firm) {
                     let eRate = firm.expertPercentage;
                     let dRate = firm.doctorPercentage;

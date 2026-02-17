@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Building2, Calculator, Receipt, FileText, Settings, TrendingDown, LifeBuoy, X } from 'lucide-react';
+import { LayoutDashboard, Building2, Calculator, Receipt, FileText, Settings, TrendingDown, LifeBuoy, X, Wallet } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -61,6 +61,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           <NavLink to="/invoices" className={navClass} onClick={() => window.innerWidth < 768 && onClose()}>
             <Receipt className="w-5 h-5" />
             <span>Kesilecek Faturalar</span>
+          </NavLink>
+          <NavLink to="/expenses" className={navClass} onClick={() => window.innerWidth < 768 && onClose()}>
+            <Wallet className="w-5 h-5" />
+            <span>Gider Yönetimi</span>
           </NavLink>
           <NavLink to="/details" className={navClass} onClick={() => window.innerWidth < 768 && onClose()}>
             <FileText className="w-5 h-5" />

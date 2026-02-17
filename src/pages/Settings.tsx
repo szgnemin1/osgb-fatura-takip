@@ -3,7 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { db } from '../services/db';
 import { exporter } from '../services/exporter';
 import { cloudService } from '../services/cloud';
-import { Save, Upload, Download, Database, AlertTriangle, FileSpreadsheet, Cloud, Trash2, AlertOctagon, RefreshCw, HardDrive, Smartphone, Network, Wifi, TrendingUp, Percent, Landmark } from 'lucide-react';
+import { Save, Upload, Download, Database, AlertTriangle, FileSpreadsheet, Cloud, Trash2, AlertOctagon, RefreshCw, HardDrive, Smartphone, Network, Wifi, TrendingUp, Percent, Landmark, Receipt } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { GlobalSettings } from '../types';
 
@@ -25,7 +25,8 @@ const Settings = () => {
       vatRateDoctor: 10,
       vatRateHealth: 10,
       reportEmail: '',
-      bankInfo: ''
+      bankInfo: '',
+      simpleDebtMode: false
   });
 
   useEffect(() => {
@@ -33,6 +34,7 @@ const Settings = () => {
     setDbPath(db.getDbPath());
     setCloudUrl(db.getCloudUrl());
     
+    // Electron vs Browser kontrolü
     if((window as any).process && (window as any).process.type === 'renderer') {
         setLocalIp(db.getLocalIpAddress());
         setIsClientMode(false);
@@ -147,17 +149,37 @@ const Settings = () => {
         <p className="text-slate-400 mt-2">Yedekleme, bağlantı ve global parametreler.</p>
       </header>
       
+      {/* BAĞLANTI & SENKRONİZASYON (MOBİL DESTEĞİ İÇİN GÜNCELLENDİ) */}
       <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col gap-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                <div>
                    <h3 className="text-lg font-bold text-white flex items-center gap-2"><Smartphone className="w-5 h-5 text-emerald-400" /> Bağlantı ve Senkronizasyon</h3>
-                   <p className="text-sm text-slate-400 mt-1">{isClientMode ? "Mobil/Tarayıcı Modu" : "Ana Bilgisayar Modu"}</p>
+                   <p className="text-sm text-slate-400 mt-1">{isClientMode ? "Mobil/Tarayıcı Modu" : "Ana Bilgisayar Modu (Sunucu Aktif)"}</p>
                </div>
           </div>
           <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 flex flex-col gap-4">
-              <div className="flex items-center gap-4 font-mono text-emerald-400 text-lg"><Network className="w-6 h-6" />{isClientMode ? window.location.host : `http://${localIp}:5000`}</div>
+              <div className="flex items-center gap-4 font-mono text-emerald-400 text-lg">
+                  <Network className="w-6 h-6" />
+                  {isClientMode ? window.location.host : `http://${localIp}:5000`}
+              </div>
+              
+              {!isClientMode && (
+                  <p className="text-xs text-slate-500">
+                      Bu adresi telefon veya diğer bilgisayarların tarayıcısına yazarak sisteme bağlanabilirsiniz. <br/>
+                      Cihazların aynı Wi-Fi ağındaki olduğundan emin olun.
+                  </p>
+              )}
+
               {!isClientMode && (<div className="flex flex-col gap-2"><button onClick={handleForceSync} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-all shadow-lg shadow-blue-900/20"><HardDrive className="w-4 h-4" /> Verileri Yayınla (Diske Kaydet)</button></div>)}
-              {isClientMode && (<div className="flex flex-col gap-2"><button onClick={handlePullFromHost} disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-all shadow-lg shadow-purple-900/20"><RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> {loading ? 'Bağlanıyor...' : 'Verileri Ana Bilgisayardan Çek'}</button></div>)}
+              
+              {isClientMode && (
+                  <div className="flex flex-col gap-2">
+                      <button onClick={handlePullFromHost} disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-all shadow-lg shadow-purple-900/20">
+                          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> 
+                          {loading ? 'Bağlanıyor...' : 'Verileri Ana Bilgisayardan Çek'}
+                      </button>
+                  </div>
+              )}
           </div>
       </div>
 
@@ -173,6 +195,30 @@ const Settings = () => {
                 <div><label className="block text-sm font-medium text-slate-400 mb-2">Doktor KDV (%)</label><input type="number" min="0" value={globalSettings.vatRateDoctor} onChange={e => setGlobalSettings(p => ({...p, vatRateDoctor: Number(e.target.value)}))} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white"/></div>
                 <div><label className="block text-sm font-medium text-slate-400 mb-2">Sağlık KDV (%)</label><input type="number" min="0" value={globalSettings.vatRateHealth} onChange={e => setGlobalSettings(p => ({...p, vatRateHealth: Number(e.target.value)}))} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white"/></div>
               </div>
+              
+              {/* YENİ: Sadeleştirilmiş Kopyalama Ayarı */}
+              <div className="border-t border-slate-700 pt-4">
+                  <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2"><Receipt className="w-4 h-4 text-orange-500" /> Fatura Kopyalama Ayarları</h4>
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-700">
+                      <div className="flex items-start gap-3">
+                          <input 
+                            type="checkbox" 
+                            id="simpleDebtMode" 
+                            checked={globalSettings.simpleDebtMode || false} 
+                            onChange={e => setGlobalSettings(p => ({...p, simpleDebtMode: e.target.checked}))} 
+                            className="mt-1 w-5 h-5 rounded border-slate-600 text-blue-600 focus:ring-blue-500"
+                          />
+                          <div>
+                              <label htmlFor="simpleDebtMode" className="block text-sm font-bold text-white cursor-pointer select-none">Sadeleştirilmiş Borç Modu</label>
+                              <p className="text-xs text-slate-400 mt-1">
+                                  Aktif edildiğinde: "Kesilecek Faturalar" sayfasındaki kopyalama butonu, <b>sadece firma borçlu ise</b> görünür. 
+                                  Kopyalanan metin sadece "Toplam Borç: X TL" bilgisini içerir, "Yalnız..." ibaresini içermez.
+                              </p>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
               <div className="border-t border-slate-700 pt-4">
                 <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2"><Landmark className="w-4 h-4 text-emerald-500" /> Banka & IBAN Bilgisi</label>
                 <textarea rows={3} value={globalSettings.bankInfo} onChange={e => setGlobalSettings(p => ({...p, bankInfo: e.target.value}))} className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-2 text-white outline-none focus:border-blue-500 resize-none font-mono text-sm" placeholder="Banka bilgilerinizi buraya girin..."/>

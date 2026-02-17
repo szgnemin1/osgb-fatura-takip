@@ -10,6 +10,7 @@ import FirmDetails from './pages/FirmDetails';
 import Settings from './pages/Settings';
 import DebtTracking from './pages/DebtTracking';
 import Support from './pages/Support';
+import Expenses from './pages/Expenses'; // Yeni Sayfa
 import { db } from './services/db';
 import { Loader2, Menu, RefreshCw, AlertCircle } from 'lucide-react';
 
@@ -95,6 +96,7 @@ const App = () => {
                 <Route path="/firms" element={<FirmRegistration />} />
                 <Route path="/prepare" element={<Preparation />} />
                 <Route path="/invoices" element={<Invoices />} />
+                <Route path="/expenses" element={<Expenses />} />
                 <Route path="/details" element={<FirmDetails />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/debt-tracking" element={<DebtTracking />} />

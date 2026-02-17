@@ -97,6 +97,7 @@ export interface GlobalSettings {
   vatRateHealth: number;
   reportEmail?: string;
   bankInfo: string;
+  simpleDebtMode?: boolean; // YENİ: Sadeleştirilmiş Borç Modu
 }
 
 export interface LogEntry {
@@ -105,4 +106,20 @@ export interface LogEntry {
   details: string;
   timestamp: string;
   deviceInfo: string;
+}
+
+// --- GİDER YÖNETİMİ TİPLERİ ---
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+}
+
+export interface Expense {
+  id: string;
+  categoryId: string;
+  date: string;
+  amount: number;
+  description: string;
+  month: number;
+  year: number;
 }
