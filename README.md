@@ -1,4 +1,4 @@
-
+ARTIK GELİŞİM SAĞLANMAYACAKTIR SON VERSİYONDUR İSTEYEN GELİŞTİRİCİLER GELİŞTİREBİLİR.
 <div align="center">
   
   <img src="public/logo.svg" alt="OSGB Pro Logo" width="120" height="120" />
