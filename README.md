@@ -104,7 +104,7 @@ osgb-fatura-takip/
 
 ## 📞 İletişim
 
-Sorularınız, önerileriniz veya hata bildirimleri için:
+Sorularınız için :
 
 **Geliştirici:** Emin Sezgin  
 📧 [m.e.sezgin04@gmail.com](mailto:m.e.sezgin04@gmail.com)
