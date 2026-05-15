@@ -112,5 +112,5 @@ Sorularınız için :
 ---
 
 <div align="center">
-  <small>© 2024 OSGB ProFinans. MIT Lisansı ile sunulmuştur.</small>
+  <small>© 2024 OSGB ProFinans. GNU General Public License v3.0 ile sunulmuştur.</small>
 </div>
